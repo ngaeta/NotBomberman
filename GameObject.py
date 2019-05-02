@@ -1,6 +1,6 @@
 import pygame
-from Circle import Circle
-from CollisionMng import CollisionMng
+from ServerCollisionsDetection.Circle import Circle
+from ServerCollisionsDetection.CollisionMng import CollisionMng
 
 
 class GameObject:
@@ -23,19 +23,20 @@ class GameObject:
 
     def set_collider_rect(self, width, height, on_collision_enter):
         self.rect = pygame.Rect(self.x, self.y, width, height)
+        CollisionMng.go_list.append(self)
         if on_collision_enter is not None:
             if self.on_collision_enter is not None:
                 CollisionMng.go_list.remove(self)
             self.on_collision_enter = on_collision_enter
-            CollisionMng.go_list.append(self)
 
     def set_collider_circle(self, radius, on_collision_enter):
         self.circle = Circle(self.x, self.y, radius)
+        CollisionMng.go_list.append(self)
         if on_collision_enter is not None:
             if self.on_collision_enter is not None:
                 CollisionMng.go_list.remove(self)
             self.on_collision_enter = on_collision_enter
-            CollisionMng.go_list.append(self)
+
 
         
 
