@@ -8,7 +8,7 @@ using System.Text;
 
 public class Client : MonoBehaviour
 {
-    enum Operation : byte { Join, SendBomb, BombSpawn, SendVelocity, ReceivePos, SpawnPlayers, BombTimer, Die }
+    enum Operation : byte { Join, SendBomb, BombSpawn, SendVelocity, ReceivePos, SpawnPlayers, BombTimer, Die, Ack }
 
     public delegate void PositionPacketReceived(int obj_ID, Vector3 pos);
     public event PositionPacketReceived OnPlayersPosReceived;
@@ -16,10 +16,11 @@ public class Client : MonoBehaviour
     public String PlayerName = "Pippo";
 
     private delegate void ReceiveOperations();
-    private Dictionary<Operation, ReceiveOperations> operations;
+    private Dictionary<Operation, ReceiveOperations> receiveCommands;
     private Socket socket;
     private EndPoint endPoint;
     private byte[] receivedData;
+    private Dictionary<int, Packet> packetNeedAck;
 
     // Start is called before the first frame update
     void Start()
@@ -28,8 +29,13 @@ public class Client : MonoBehaviour
         socket.Blocking = false;
         endPoint = new IPEndPoint(IPAddress.Loopback, Port);
 
-        operations = new Dictionary<Operation, ReceiveOperations>();
-        operations[Operation.ReceivePos] = ParsePositionPacket;
+        packetNeedAck = new Dictionary<int, Packet>();
+
+        receiveCommands = new Dictionary<Operation, ReceiveOperations>();
+        receiveCommands[Operation.ReceivePos] = ParsePositionPacket;
+        receiveCommands[Operation.Ack] = Ack;
+
+        Join();
     }
 
     // Update is called once per frame
@@ -37,42 +43,60 @@ public class Client : MonoBehaviour
     {
         //Receive operations
         DequeuePackets();
-        if (receivedData != null && operations.ContainsKey((Operation)receivedData[0]))
+        if (receivedData != null && receiveCommands.ContainsKey((Operation)receivedData[0]))
         {
             Debug.Log("Pacchetto arrivato: " + PrintPacket(receivedData));
-            operations[(Operation)receivedData[0]]();
+            receiveCommands[(Operation)receivedData[0]]();
+        }
+
+        //Resend packet without ack
+        if (packetNeedAck.Count > 0)
+        {
+            foreach (int id in packetNeedAck.Keys)
+            {
+                Packet packet = packetNeedAck[id];
+                if (packet.TimeRemainingToResend <= 0)
+                {
+                    socket.SendTo(packet.GetData(), endPoint);
+                    packet.ResetTimeRemaining();
+                }
+                else
+                    packet.TimeRemainingToResend -= Time.deltaTime;
+            }
         }
     }
 
     public void SendVelocityPacket(Vector3 velocity)
     {
-        byte[] setVelocityPacket = new byte[13];
-        setVelocityPacket[0] = (byte)Operation.SendVelocity;
+        byte command = (byte)Operation.SendVelocity;
+        float x = velocity.x;
+        float y = velocity.y;
+        float z = velocity.z;
 
-        byte[] velocityX;
-        byte[] velocityY;
-        byte[] velocityZ;
-        velocityX = BitConverter.GetBytes(velocity.x);
-        velocityY = BitConverter.GetBytes(velocity.y);
-        velocityZ = BitConverter.GetBytes(velocity.z);
-
-        Buffer.BlockCopy(velocityX, 0, setVelocityPacket, 1, 4);
-        Buffer.BlockCopy(velocityY, 0, setVelocityPacket, 5, 4);
-        Buffer.BlockCopy(velocityZ, 0, setVelocityPacket, 9, 4);
-
-        socket.SendTo(setVelocityPacket, endPoint);
+        Packet setVelocityPacket = new Packet(command, x, y, z);
+        socket.SendTo(setVelocityPacket.GetData(), endPoint);
     }
 
     private void Join()
     {
-        byte[] byteNames = Encoding.ASCII.GetBytes(PlayerName);
-        byte[] dataToSend = new byte[byteNames.Length + 1];
+        byte command = (byte)Operation.Join;
 
-        dataToSend[0] = (byte)Operation.Join;
-        Buffer.BlockCopy(byteNames, 0, dataToSend, 1, byteNames.Length);
-        socket.SendTo(dataToSend, endPoint);
+        Packet joinPacket = new Packet(command, PlayerName);
+        joinPacket.ResendAfter = 1f;
+        socket.SendTo(joinPacket.GetData(), endPoint);  
+        
+        packetNeedAck.Add(joinPacket.Id, joinPacket);
+        PrintPacket(joinPacket.GetData());
+    }
 
-        PrintPacket(dataToSend);
+    private void Ack()
+    {
+        if (receivedData.Length != 5)
+            return;
+
+        int idPacket = BitConverter.ToInt32(receivedData, 1);
+        if (packetNeedAck.ContainsKey(idPacket))
+            packetNeedAck.Remove(idPacket);
     }
 
     private void ParsePositionPacket()
