@@ -8,19 +8,23 @@ using System.Text;
 
 public class Client : MonoBehaviour
 {
-    enum Operation : byte { Join, SendBomb, BombSpawn, SendVelocity, ReceivePos, SpawnPlayers, BombTimer, Die, Ack }
+    enum Operation : byte
+    {
+        Join, SendBomb, SpawnObj, SendVelocity, ReceivePos, BombTimer, Die, Ack
+    }
 
-    public delegate void PositionPacketReceived(int obj_ID, Vector3 pos);
-    public event PositionPacketReceived OnPlayersPosReceived;
+    public delegate void SpawnObject(int id, float x, float y, float z);
+    public static event SpawnObject OnSpawnPacketReceived;
     public int Port = 9999;
-    public String PlayerName = "Pippo";
 
     private delegate void ReceiveOperations();
     private Dictionary<Operation, ReceiveOperations> receiveCommands;
+
+    private Dictionary<int, Packet> packetNeedAck;
+    private Dictionary<int, IClientPositionable> positionableObj;
     private Socket socket;
     private EndPoint endPoint;
-    private byte[] receivedData;
-    private Dictionary<int, Packet> packetNeedAck;
+    private byte[] receivedData;  
 
     // Start is called before the first frame update
     void Start()
@@ -30,12 +34,12 @@ public class Client : MonoBehaviour
         endPoint = new IPEndPoint(IPAddress.Loopback, Port);
 
         packetNeedAck = new Dictionary<int, Packet>();
+        positionableObj = new Dictionary<int, IClientPositionable>();
 
         receiveCommands = new Dictionary<Operation, ReceiveOperations>();
-        receiveCommands[Operation.ReceivePos] = ParsePositionPacket;
+        receiveCommands[Operation.ReceivePos] = PositionPacketCallback;
+        receiveCommands[Operation.SpawnObj] = SpawnPacketCallback;
         receiveCommands[Operation.Ack] = Ack;
-
-        Join();
     }
 
     // Update is called once per frame
@@ -45,7 +49,9 @@ public class Client : MonoBehaviour
         DequeuePackets();
         if (receivedData != null && receiveCommands.ContainsKey((Operation)receivedData[0]))
         {
-            Debug.Log("Pacchetto arrivato: " + PrintPacket(receivedData));
+            Debug.Log("Pacchetto arrivato: ");
+            PrintPacket(receivedData);
+
             receiveCommands[(Operation)receivedData[0]]();
         }
 
@@ -66,6 +72,18 @@ public class Client : MonoBehaviour
         }
     }
 
+    public void Join(String playerName)
+    {
+        byte command = (byte)Operation.Join;
+
+        Packet joinPacket = new Packet(command, playerName);
+        joinPacket.ResendAfter = 1f;
+        socket.SendTo(joinPacket.GetData(), endPoint);
+
+        packetNeedAck.Add(joinPacket.Id, joinPacket);
+        PrintPacket(joinPacket.GetData());
+    }
+
     public void SendVelocityPacket(Vector3 velocity)
     {
         byte command = (byte)Operation.SendVelocity;
@@ -77,16 +95,43 @@ public class Client : MonoBehaviour
         socket.SendTo(setVelocityPacket.GetData(), endPoint);
     }
 
-    private void Join()
+    public bool RegisterObjPositionable(int id, IClientPositionable positionable)
     {
-        byte command = (byte)Operation.Join;
+        if(!positionableObj.ContainsKey(id))
+        {
+            positionableObj.Add(id, positionable);
+            return true;
+        }
+        return false;
+    }
 
-        Packet joinPacket = new Packet(command, PlayerName);
-        joinPacket.ResendAfter = 1f;
-        socket.SendTo(joinPacket.GetData(), endPoint);  
-        
-        packetNeedAck.Add(joinPacket.Id, joinPacket);
-        PrintPacket(joinPacket.GetData());
+    private void SpawnPacketCallback()
+    {
+        if (receivedData.Length != 17)
+            return;
+    
+        int idObjToSpawn = BitConverter.ToInt32(receivedData, 1);
+        float x = BitConverter.ToSingle(receivedData, 5);
+        float y = BitConverter.ToSingle(receivedData, 9);
+        float z = BitConverter.ToSingle(receivedData, 13);
+
+        if(OnSpawnPacketReceived != null)
+        {
+            OnSpawnPacketReceived(idObjToSpawn, x, y, z);
+        }
+    }
+
+    private void PositionPacketCallback()
+    {
+        if (receivedData.Length != 17)
+            return;
+
+        int id = BitConverter.ToInt32(receivedData, 1);
+        float x = BitConverter.ToSingle(receivedData, 5);
+        float y = BitConverter.ToSingle(receivedData, 9);
+        float z = BitConverter.ToSingle(receivedData, 13);
+
+        positionableObj[id].OnPositionPacketReceived(x, y, z);
     }
 
     private void Ack()
@@ -97,20 +142,6 @@ public class Client : MonoBehaviour
         int idPacket = BitConverter.ToInt32(receivedData, 1);
         if (packetNeedAck.ContainsKey(idPacket))
             packetNeedAck.Remove(idPacket);
-    }
-
-    private void ParsePositionPacket()
-    {
-        if (receivedData.Length != 14)
-            return;
-
-        float x = BitConverter.ToSingle(receivedData, 2);
-        float y = BitConverter.ToSingle(receivedData, 6);
-        float z = BitConverter.ToSingle(receivedData, 10);
-        if (OnPlayersPosReceived != null)
-        {
-            OnPlayersPosReceived(receivedData[1], new Vector3(x, y, z));
-        }
     }
 
     private void DequeuePackets()
@@ -130,14 +161,15 @@ public class Client : MonoBehaviour
         }
     }
 
-    private string PrintPacket(byte[] packet)
+    private void PrintPacket(byte[] packet)
     {
-        String returnString = "[";
+        String stringToPrint = "[";
         for (int i = 0; i < packet.Length; i++)
         {
-            returnString += packet[i] + ", ";
+            stringToPrint += packet[i] + ", ";
         }
-        returnString = "]";
-        return returnString;
+        stringToPrint += "]";
+
+        Debug.Log(stringToPrint);
     }
 }
