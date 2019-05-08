@@ -10,7 +10,7 @@ public class Client : MonoBehaviour
 {
     enum Operation : byte
     {
-        Join, SendBomb, SpawnObj, SendVelocity, ReceivePos, BombTimer, Die, Ack
+        Join, SendBomb, SpawnObj, SendVelocity, ReceivePos, BombTimer, Die, JoinAck, Ack
     }
 
     public delegate void SpawnObject(int id, float x, float y, float z);
@@ -22,6 +22,8 @@ public class Client : MonoBehaviour
 
     private Dictionary<int, Packet> packetNeedAck;
     private Dictionary<int, IClientPositionable> positionableObj;
+    private Dictionary<string, IClientJoinable> joinablePlayers;  //There could be more players
+    private IClientJoinable clientJoin;
     private Socket socket;
     private EndPoint endPoint;
     private byte[] receivedData;  
@@ -34,12 +36,15 @@ public class Client : MonoBehaviour
         endPoint = new IPEndPoint(IPAddress.Loopback, Port);
 
         packetNeedAck = new Dictionary<int, Packet>();
+
         positionableObj = new Dictionary<int, IClientPositionable>();
+        joinablePlayers = new Dictionary<string, IClientJoinable>();
 
         receiveCommands = new Dictionary<Operation, ReceiveOperations>();
         receiveCommands[Operation.ReceivePos] = PositionPacketCallback;
         receiveCommands[Operation.SpawnObj] = SpawnPacketCallback;
-        receiveCommands[Operation.Ack] = Ack;
+        receiveCommands[Operation.JoinAck] = JoinAckReceived;
+        receiveCommands[Operation.Ack] = AckReceived;
     }
 
     // Update is called once per frame
@@ -72,8 +77,10 @@ public class Client : MonoBehaviour
         }
     }
 
-    public void Join(String playerName)
+    public void Join(String playerName, IClientJoinable clientJoin)
     {
+        this.clientJoin = clientJoin;
+
         byte command = (byte)Operation.Join;
 
         Packet joinPacket = new Packet(command, playerName);
@@ -134,7 +141,32 @@ public class Client : MonoBehaviour
         positionableObj[id].OnPositionPacketReceived(x, y, z);
     }
 
-    private void Ack()
+    private void JoinAckReceived()
+    {
+        //join ack packet only with boolean byte [idPacket, byte(1=true, 0=false)]
+        if (receivedData.Length == 2)
+        {
+            clientJoin.OnJoinFailed();
+            return;
+        }
+
+        if (receivedData.Length != 18)
+            return;
+
+        bool isJoined = receivedData[1] == 1;
+        if (isJoined)
+        {
+            int id = BitConverter.ToInt32(receivedData, 1);
+            float x = BitConverter.ToSingle(receivedData, 5);
+            float y = BitConverter.ToSingle(receivedData, 9);
+            float z = BitConverter.ToSingle(receivedData, 13);
+            clientJoin.OnJoinSucces(id, new Vector3(x, y, z));
+        }
+        else
+            clientJoin.OnJoinFailed(); 
+    }
+
+    private void AckReceived()
     {
         if (receivedData.Length != 5)
             return;
