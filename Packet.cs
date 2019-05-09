@@ -29,6 +29,7 @@ public class Packet
         writer = new BinaryWriter(stream);
         Id = ++packetCounter;
         Attempts = 0;
+        ResendAfter = 0.05f;
     }
 
     public Packet(byte command, params object[] elements) : this()
