@@ -10,19 +10,23 @@ public class Client : MonoBehaviour
 {
     enum Operation : byte
     {
-        Join, SendBomb, SpawnObj, SendVelocity, ReceivePos, BombTimer, Die, JoinAck, Ack
+        Join, ShootBomb, SpawnObj, SendVelocity, ReceivePos, BombTimer, PlayerDie, JoinAck, Ack
     }
+
+    public String Address = "127.0.0.1";
+    public int Port = 9999;
 
     public delegate void SpawnObject(int id, float x, float y, float z);
     public static event SpawnObject OnSpawnPacketReceived;
-    public int Port = 9999;
-
+    public delegate void BombTimer(int id, byte currTimer);
+    public static event BombTimer OnBombTimerPacketReceived;
+    public delegate void PlayerDie(int id);
+    public static event PlayerDie OnPlayerDiePacketReceived;
+    
     private delegate void ReceiveOperations();
     private Dictionary<Operation, ReceiveOperations> receiveCommands;
-
     private Dictionary<int, Packet> packetNeedAck;
     private Dictionary<int, IClientPositionable> positionableObj;
-    private Dictionary<string, IClientJoinable> joinablePlayers;  //There could be more players
     private IClientJoinable clientJoin;
     private Socket socket;
     private EndPoint endPoint;
@@ -33,16 +37,16 @@ public class Client : MonoBehaviour
     {
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         socket.Blocking = false;
-        endPoint = new IPEndPoint(IPAddress.Loopback, Port);
+        endPoint = new IPEndPoint(IPAddress.Parse(Address), Port);
 
         packetNeedAck = new Dictionary<int, Packet>();
-
         positionableObj = new Dictionary<int, IClientPositionable>();
-        joinablePlayers = new Dictionary<string, IClientJoinable>();
 
         receiveCommands = new Dictionary<Operation, ReceiveOperations>();
         receiveCommands[Operation.ReceivePos] = PositionPacketCallback;
         receiveCommands[Operation.SpawnObj] = SpawnPacketCallback;
+        receiveCommands[Operation.BombTimer] = BombTimerPacketCallback;
+        receiveCommands[Operation.PlayerDie] = DiePacketCallback;
         receiveCommands[Operation.JoinAck] = JoinAckReceived;
         receiveCommands[Operation.Ack] = AckReceived;
     }
@@ -89,6 +93,18 @@ public class Client : MonoBehaviour
 
         packetNeedAck.Add(joinPacket.Id, joinPacket);
         PrintPacket(joinPacket.GetData());
+    }
+
+    public void SendShootBombPacket(Vector3 position)
+    {
+        byte command = (byte)Operation.ShootBomb;
+
+        Packet shootBombPacket = new Packet(command, position.x, position.y, position.z);
+        shootBombPacket.ResendAfter = .05f;
+        socket.SendTo(shootBombPacket.GetData(), endPoint);
+
+        packetNeedAck.Add(shootBombPacket.Id, shootBombPacket);
+        PrintPacket(shootBombPacket.GetData());
     }
 
     public void SendVelocityPacket(Vector3 velocity)
@@ -141,6 +157,32 @@ public class Client : MonoBehaviour
         positionableObj[id].OnPositionPacketReceived(x, y, z);
     }
 
+    private void BombTimerPacketCallback()
+    {
+        if (receivedData.Length != 6)
+            return;
+
+        int bombId = BitConverter.ToInt32(receivedData, 1);
+        byte currTimer = receivedData[5];
+
+        if (OnBombTimerPacketReceived != null)
+        {
+            OnBombTimerPacketReceived(bombId, currTimer);
+        }
+    }
+
+    private void DiePacketCallback()
+    {
+        if (receivedData.Length != 5)
+            return;
+
+        int playerId = BitConverter.ToInt32(receivedData, 1);
+        if (OnPlayerDiePacketReceived != null)
+        {
+            OnPlayerDiePacketReceived(playerId);
+        }
+    }
+
     private void JoinAckReceived()
     {
         //join ack packet only with boolean byte [idPacket, byte(1=true, 0=false)]
@@ -174,6 +216,18 @@ public class Client : MonoBehaviour
         int idPacket = BitConverter.ToInt32(receivedData, 1);
         if (packetNeedAck.ContainsKey(idPacket))
             packetNeedAck.Remove(idPacket);
+    }
+
+    private void SendAck(int packetId)
+    {
+        //byte command = (byte)Operation.Ack;
+
+        //Packet ackPacket = new Packet(command, packetId);
+        //ackPacket.ResendAfter = .05f;
+        //socket.SendTo(ackPacket.GetData(), endPoint);
+
+        //packetNeedAck.Add(ackPacket.Id, ackPacket);
+        //PrintPacket(ackPacket.GetData());
     }
 
     private void DequeuePackets()
