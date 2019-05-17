@@ -13,10 +13,10 @@ public class Client : MonoBehaviour
         Join, ShootBomb, SpawnObj, SendVelocity, ReceivePos, BombTimer, PlayerDie, JoinAck, Ack
     }
 
-    public String Address = "127.0.0.1";
+    public string Address = "127.0.0.1";
     public int Port = 9999;
 
-    public delegate void SpawnObject(int id, float x, float y, float z);
+    public delegate void SpawnObject(byte idObjToSpawn, int idObj, Vector3 pos);
     public static event SpawnObject OnSpawnPacketReceived;
     public delegate void BombTimer(int id, byte currTimer);
     public static event BombTimer OnBombTimerPacketReceived;
@@ -81,7 +81,7 @@ public class Client : MonoBehaviour
         }
     }
 
-    public void Join(String playerName, IClientJoinable clientJoin)
+    public void Join(string playerName, IClientJoinable clientJoin)
     {
         this.clientJoin = clientJoin;
 
@@ -130,17 +130,18 @@ public class Client : MonoBehaviour
 
     private void SpawnPacketCallback()
     {
-        if (receivedData.Length != 17)
+        if (receivedData.Length != 18)
             return;
-    
-        int idObjToSpawn = BitConverter.ToInt32(receivedData, 1);
-        float x = BitConverter.ToSingle(receivedData, 5);
-        float y = BitConverter.ToSingle(receivedData, 9);
-        float z = BitConverter.ToSingle(receivedData, 13);
+
+        byte idObjToSpawn = receivedData[1];
+        int idObj = BitConverter.ToInt32(receivedData, 2);
+        float x = BitConverter.ToSingle(receivedData, 6);
+        float y = BitConverter.ToSingle(receivedData, 10);
+        float z = BitConverter.ToSingle(receivedData, 14);
 
         if(OnSpawnPacketReceived != null)
         {
-            OnSpawnPacketReceived(idObjToSpawn, x, y, z);
+            OnSpawnPacketReceived(idObjToSpawn, idObj, new Vector3(x, y, z));
         }
     }
 
