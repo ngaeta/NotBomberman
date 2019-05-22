@@ -57,6 +57,10 @@ public class Packet
             {
                 writer.Write((uint)element);
             }
+            else if (element is string)
+            {
+                writer.Write((string)element);
+            }
             else
             {
                 throw new System.Exception("unknown type");
