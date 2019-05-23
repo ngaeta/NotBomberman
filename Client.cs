@@ -22,7 +22,7 @@ public class Client : MonoBehaviour
     public static event BombTimer OnBombTimerPacketReceived;
     public delegate void PlayerDie(int id);
     public static event PlayerDie OnPlayerDiePacketReceived;
-    
+
     private delegate void ReceiveOperations();
     private Dictionary<Operation, ReceiveOperations> receiveCommands;
     private Dictionary<int, Packet> packetNeedAck;
@@ -30,7 +30,7 @@ public class Client : MonoBehaviour
     private IClientJoinable clientJoin;
     private Socket socket;
     private EndPoint endPoint;
-    private byte[] receivedData;  
+    private byte[] receivedData;
 
     // Start is called before the first frame update
     void Start()
@@ -120,7 +120,7 @@ public class Client : MonoBehaviour
 
     public bool RegisterObjPositionable(int id, IClientPositionable positionable)
     {
-        if(!positionableObj.ContainsKey(id))
+        if (!positionableObj.ContainsKey(id))
         {
             positionableObj.Add(id, positionable);
             return true;
@@ -139,7 +139,7 @@ public class Client : MonoBehaviour
         float y = BitConverter.ToSingle(receivedData, 10);
         float z = BitConverter.ToSingle(receivedData, 14);
 
-        if(OnSpawnPacketReceived != null)
+        if (OnSpawnPacketReceived != null)
         {
             OnSpawnPacketReceived(idObjToSpawn, idObj, new Vector3(x, y, z));
         }
@@ -206,7 +206,7 @@ public class Client : MonoBehaviour
             clientJoin.OnJoinSucces(id, new Vector3(x, y, z));
         }
         else
-            clientJoin.OnJoinFailed(); 
+            clientJoin.OnJoinFailed();
     }
 
     private void AckReceived()
