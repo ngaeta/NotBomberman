@@ -195,6 +195,7 @@ public class Client : MonoBehaviour
             return;
         }
 
+        //join succes packet [command, 1, idPlayer, x, y, z, idPacket]
         if (receivedData.Length == 22)
         {
             bool isJoined = receivedData[1] == 1;
