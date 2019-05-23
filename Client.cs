@@ -186,27 +186,33 @@ public class Client : MonoBehaviour
 
     private void JoinAckReceived()
     {
-        //join ack packet only with boolean byte [idPacket, byte(1=true, 0=false)]
-        if (receivedData.Length == 2)
+        //join failed packet [command, 0, idPacket]
+        if (receivedData.Length == 6)
         {
+            int idPacket = BitConverter.ToInt32(receivedData, 2);
+            packetNeedAck.Remove(idPacket);
             clientJoin.OnJoinFailed();
             return;
         }
 
-        if (receivedData.Length != 18)
-            return;
-
-        bool isJoined = receivedData[1] == 1;
-        if (isJoined)
+        if (receivedData.Length == 22)
         {
-            int id = BitConverter.ToInt32(receivedData, 1);
-            float x = BitConverter.ToSingle(receivedData, 5);
-            float y = BitConverter.ToSingle(receivedData, 9);
-            float z = BitConverter.ToSingle(receivedData, 13);
-            clientJoin.OnJoinSucces(id, new Vector3(x, y, z));
+            bool isJoined = receivedData[1] == 1;
+            if (isJoined)
+            {
+                int idPlayer = BitConverter.ToInt32(receivedData, 2);
+                float x = BitConverter.ToSingle(receivedData, 6);
+                float y = BitConverter.ToSingle(receivedData, 10);
+                float z = BitConverter.ToSingle(receivedData, 14);
+
+                clientJoin.OnJoinSucces(idPlayer, new Vector3(x, y, z));
+            }
+            else
+                clientJoin.OnJoinFailed();
+
+            int idPacket = BitConverter.ToInt32(receivedData, 18);
+            packetNeedAck.Remove(idPacket);
         }
-        else
-            clientJoin.OnJoinFailed();
     }
 
     private void AckReceived()
