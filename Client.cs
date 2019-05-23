@@ -26,6 +26,8 @@ public class Client : MonoBehaviour
     private delegate void ReceiveOperations();
     private Dictionary<Operation, ReceiveOperations> receiveCommands;
     private Dictionary<int, Packet> packetNeedAck;
+    private Dictionary<int, Packet> ackToResendToServer;
+    private List<int> packetsToRemove;
     private Dictionary<int, IClientPositionable> positionableObj;
     private IClientJoinable clientJoin;
     private Socket socket;
@@ -40,6 +42,8 @@ public class Client : MonoBehaviour
         endPoint = new IPEndPoint(IPAddress.Parse(Address), Port);
 
         packetNeedAck = new Dictionary<int, Packet>();
+        ackToResendToServer = new Dictionary<int, Packet>();
+        packetsToRemove = new List<int>();
         positionableObj = new Dictionary<int, IClientPositionable>();
 
         receiveCommands = new Dictionary<Operation, ReceiveOperations>();
@@ -65,20 +69,37 @@ public class Client : MonoBehaviour
         }
 
         //Resend packet without ack
-        if (packetNeedAck.Count > 0)
+        foreach (int id in packetNeedAck.Keys)
         {
-            foreach (int id in packetNeedAck.Keys)
+            Packet packet = packetNeedAck[id];
+            if (packet.TimeRemainingToResend <= 0)
             {
-                Packet packet = packetNeedAck[id];
-                if (packet.TimeRemainingToResend <= 0)
-                {
-                    socket.SendTo(packet.GetData(), endPoint);
-                    packet.ResetTimeRemaining();
-                }
-                else
-                    packet.TimeRemainingToResend -= Time.deltaTime;
+                socket.SendTo(packet.GetData(), endPoint);
+                packet.ResetTimeRemaining();
             }
+            else
+                packet.TimeRemainingToResend -= Time.deltaTime;
         }
+
+        //Resend the acks several times to make sure the server has received it
+        foreach (int id in ackToResendToServer.Keys)
+        {
+            Packet packet = ackToResendToServer[id];
+            if (packet.NumTimesToSend > 0)
+            {
+                socket.SendTo(packet.GetData(), endPoint);
+                packet.NumTimesToSend--;
+            }
+            else
+                packetsToRemove.Add(id);
+        }
+
+        //Remove ack packet sent to server
+        for(int i=0; i < packetsToRemove.Count; i++)
+        {
+            ackToResendToServer.Remove(packetsToRemove[i]);
+        }
+        packetsToRemove.Clear();
     }
 
     public void Join(string playerName, IClientJoinable clientJoin)
@@ -130,7 +151,7 @@ public class Client : MonoBehaviour
 
     private void SpawnPacketCallback()
     {
-        if (receivedData.Length != 18)
+        if (receivedData.Length != 22)
             return;
 
         byte idObjToSpawn = receivedData[1];
@@ -143,11 +164,14 @@ public class Client : MonoBehaviour
         {
             OnSpawnPacketReceived(idObjToSpawn, idObj, new Vector3(x, y, z));
         }
+
+        int idPacket = BitConverter.ToInt32(receivedData, 18);
+        SendAck(idPacket);
     }
 
     private void PositionPacketCallback()
     {
-        if (receivedData.Length != 17)
+        if (receivedData.Length != 21)
             return;
 
         int id = BitConverter.ToInt32(receivedData, 1);
@@ -155,17 +179,19 @@ public class Client : MonoBehaviour
         float y = BitConverter.ToSingle(receivedData, 9);
         float z = BitConverter.ToSingle(receivedData, 13);
 
+        //Send ack does not necessary
         positionableObj[id].OnPositionPacketReceived(x, y, z);
     }
 
     private void BombTimerPacketCallback()
     {
-        if (receivedData.Length != 6)
+        if (receivedData.Length != 10)
             return;
 
         int bombId = BitConverter.ToInt32(receivedData, 1);
         byte currTimer = receivedData[5];
 
+        //Is sendAck necessary???
         if (OnBombTimerPacketReceived != null)
         {
             OnBombTimerPacketReceived(bombId, currTimer);
@@ -174,7 +200,7 @@ public class Client : MonoBehaviour
 
     private void DiePacketCallback()
     {
-        if (receivedData.Length != 5)
+        if (receivedData.Length != 9)
             return;
 
         int playerId = BitConverter.ToInt32(receivedData, 1);
@@ -182,6 +208,9 @@ public class Client : MonoBehaviour
         {
             OnPlayerDiePacketReceived(playerId);
         }
+
+        int idPacket = BitConverter.ToInt32(receivedData, 5);
+        SendAck(idPacket);
     }
 
     private void JoinAckReceived()
@@ -226,16 +255,14 @@ public class Client : MonoBehaviour
             packetNeedAck.Remove(idPacket);
     }
 
-    private void SendAck(int packetId)
+    private void SendAck(int packetId, int numTimesToSend = 10)
     {
-        //byte command = (byte)Operation.Ack;
+        byte command = (byte)Operation.Ack;
+        Packet ackPacket = new Packet(command, packetId);
+        ackPacket.NumTimesToSend = numTimesToSend;
+        ackToResendToServer.Add(packetId, ackPacket);
 
-        //Packet ackPacket = new Packet(command, packetId);
-        //ackPacket.ResendAfter = .05f;
-        //socket.SendTo(ackPacket.GetData(), endPoint);
-
-        //packetNeedAck.Add(ackPacket.Id, ackPacket);
-        //PrintPacket(ackPacket.GetData());
+        socket.SendTo(ackPacket.GetData(), endPoint);
     }
 
     private void DequeuePackets()
