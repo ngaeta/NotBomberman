@@ -24,10 +24,10 @@ public class Client : MonoBehaviour
     private Dictionary<int, Packet> packetNeedAck;
     private Dictionary<int, bool> serverPacketAlreadyArrived;
 
-    private Dictionary<int, IClientPositionable> positionableObj;
-    private Dictionary<int, IClientTimerable> timerableObj;
-    private Dictionary<int, IClientDestroyable> destoryableObj;
-    private IClientJoinable clientJoin;
+    private Dictionary<int, IPositionPacketHandler> positionableObj;
+    private Dictionary<int, ITimerPacketHandler> timerableObj;
+    private Dictionary<int, IDestroyPacketHandler> destoryableObj;
+    private IJoinPacketHandler clientJoin;
 
     private Socket socket;
     private EndPoint endPoint;
@@ -42,9 +42,9 @@ public class Client : MonoBehaviour
 
         packetNeedAck = new Dictionary<int, Packet>();
         serverPacketAlreadyArrived = new Dictionary<int, bool>();
-        positionableObj = new Dictionary<int, IClientPositionable>();
-        timerableObj = new Dictionary<int, IClientTimerable>();
-        destoryableObj = new Dictionary<int, IClientDestroyable>();
+        positionableObj = new Dictionary<int, IPositionPacketHandler>();
+        timerableObj = new Dictionary<int, ITimerPacketHandler>();
+        destoryableObj = new Dictionary<int, IDestroyPacketHandler>();
 
         receiveCommands = new Dictionary<Operation, ReceiveOperations>();
         receiveCommands[Operation.SpawnObj] = ProcessSpawnPacket;
@@ -87,7 +87,7 @@ public class Client : MonoBehaviour
         }
     }
 
-    public void Join(string playerName, IClientJoinable clientJoin)
+    public void Join(string playerName, IJoinPacketHandler clientJoin)
     {
         this.clientJoin = clientJoin;
 
@@ -124,7 +124,7 @@ public class Client : MonoBehaviour
         socket.SendTo(setVelocityPacket.GetData(), endPoint);
     }
 
-    public bool RegisterObjPositionable(int id, IClientPositionable positionable)
+    public bool RegisterObjPositionable(int id, IPositionPacketHandler positionable)
     {
         if (!positionableObj.ContainsKey(id))
         {
@@ -134,7 +134,7 @@ public class Client : MonoBehaviour
         return false;
     }
 
-    public bool RegisterObjTimerable(int id, IClientTimerable timerable)
+    public bool RegisterObjTimerable(int id, ITimerPacketHandler timerable)
     {
         if (!timerableObj.ContainsKey(id))
         {
@@ -144,7 +144,7 @@ public class Client : MonoBehaviour
         return false;
     }
 
-    public bool RegisterObjDestroyable(int id, IClientDestroyable destroyable)
+    public bool RegisterObjDestroyable(int id, IDestroyPacketHandler destroyable)
     {
         if (!destoryableObj.ContainsKey(id))
         {
@@ -228,7 +228,7 @@ public class Client : MonoBehaviour
         {
             int idPacket = BitConverter.ToInt32(receivedData, 2);
             packetNeedAck.Remove(idPacket);
-            clientJoin.OnJoinFailed();
+            clientJoin.OnJoinPacketFailed();
             return;
         }
 
@@ -243,10 +243,10 @@ public class Client : MonoBehaviour
                 float y = BitConverter.ToSingle(receivedData, 10);
                 float z = BitConverter.ToSingle(receivedData, 14);
 
-                clientJoin.OnJoinSucces(idPlayer, new Vector3(x, y, z));
+                clientJoin.OnJoinPacketSucces(idPlayer, new Vector3(x, y, z));
             }
             else
-                clientJoin.OnJoinFailed();
+                clientJoin.OnJoinPacketFailed();
 
             int idPacket = BitConverter.ToInt32(receivedData, 18);
             packetNeedAck.Remove(idPacket);
