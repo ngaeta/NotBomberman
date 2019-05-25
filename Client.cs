@@ -10,7 +10,7 @@ public class Client : MonoBehaviour
 {
     enum Operation : byte
     {
-        Join, ShootBomb, SpawnObj, SendVelocity, ReceivePos, BombTimer, PlayerDie, JoinAck, Ack
+        Join, ShootBomb, SpawnObj, SendVelocity, ReceivePos, ReceiveTimer, ReceiveDestroy, JoinAck, Ack
     }
 
     public string Address = "192.168.3.194";
@@ -18,17 +18,17 @@ public class Client : MonoBehaviour
 
     public delegate void SpawnObject(byte idObjToSpawn, int idObj, Vector3 pos);
     public static event SpawnObject OnSpawnPacketReceived;
-    public delegate void BombTimer(int id, float bombTimer);
-    public static event BombTimer OnBombTimerPacketReceived;
-    public delegate void PlayerDie(int id);
-    public static event PlayerDie OnPlayerDiePacketReceived;
 
     private delegate void ReceiveOperations();
     private Dictionary<Operation, ReceiveOperations> receiveCommands;
     private Dictionary<int, Packet> packetNeedAck;
     private Dictionary<int, bool> serverPacketAlreadyArrived;
+
     private Dictionary<int, IClientPositionable> positionableObj;
+    private Dictionary<int, IClientTimerable> timerableObj;
+    private Dictionary<int, IClientDestroyable> destoryableObj;
     private IClientJoinable clientJoin;
+
     private Socket socket;
     private EndPoint endPoint;
     private byte[] receivedData;
@@ -43,12 +43,14 @@ public class Client : MonoBehaviour
         packetNeedAck = new Dictionary<int, Packet>();
         serverPacketAlreadyArrived = new Dictionary<int, bool>();
         positionableObj = new Dictionary<int, IClientPositionable>();
+        timerableObj = new Dictionary<int, IClientTimerable>();
+        destoryableObj = new Dictionary<int, IClientDestroyable>();
 
         receiveCommands = new Dictionary<Operation, ReceiveOperations>();
-        receiveCommands[Operation.ReceivePos] = PositionPacketCallback;
-        receiveCommands[Operation.SpawnObj] = SpawnPacketCallback;
-        receiveCommands[Operation.BombTimer] = BombTimerPacketCallback;
-        receiveCommands[Operation.PlayerDie] = DiePacketCallback;
+        receiveCommands[Operation.SpawnObj] = ProcessSpawnPacket;
+        receiveCommands[Operation.ReceivePos] = ProcessPositionPacket;
+        receiveCommands[Operation.ReceiveTimer] = ProcessTimerPacket;
+        receiveCommands[Operation.ReceiveDestroy] = ProcessDestroyPacket;
         receiveCommands[Operation.JoinAck] = JoinAckReceived;
         receiveCommands[Operation.Ack] = AckReceived;
     }
@@ -79,7 +81,7 @@ public class Client : MonoBehaviour
                 packet.TimeRemainingToResend -= Time.deltaTime;
         }
 
-        //Hold in memory for n seconds before remove it
+        //Keep in memory for n seconds before remove them
         foreach (int id in serverPacketAlreadyArrived.Keys)
         {
         }
@@ -132,7 +134,27 @@ public class Client : MonoBehaviour
         return false;
     }
 
-    private void SpawnPacketCallback()
+    public bool RegisterObjTimerable(int id, IClientTimerable timerable)
+    {
+        if (!timerableObj.ContainsKey(id))
+        {
+            timerableObj.Add(id, timerable);
+            return true;
+        }
+        return false;
+    }
+
+    public bool RegisterObjDestroyable(int id, IClientDestroyable destroyable)
+    {
+        if (!destoryableObj.ContainsKey(id))
+        {
+            destoryableObj.Add(id, destroyable);
+            return true;
+        }
+        return false;
+    }
+
+    private void ProcessSpawnPacket()
     {
         if (receivedData.Length != 22)
             return;
@@ -158,7 +180,7 @@ public class Client : MonoBehaviour
         SendAck(idPacket);      
     }
 
-    private void PositionPacketCallback()
+    private void ProcessPositionPacket()
     {
         if (receivedData.Length != 21)
             return;
@@ -172,7 +194,7 @@ public class Client : MonoBehaviour
         positionableObj[id].OnPositionPacketReceived(x, y, z);
     }
 
-    private void BombTimerPacketCallback()
+    private void ProcessTimerPacket()
     {
         if (receivedData.Length != 13)
             return;
@@ -180,13 +202,10 @@ public class Client : MonoBehaviour
         int bombId = BitConverter.ToInt32(receivedData, 1);
         float bombTimer = BitConverter.ToSingle(receivedData, 5);
 
-        if (OnBombTimerPacketReceived != null)
-        {
-            OnBombTimerPacketReceived(bombId, bombTimer);
-        }
+        timerableObj[bombId].OnTimerPacketRecevied(bombTimer);
     }
 
-    private void DiePacketCallback()
+    private void ProcessDestroyPacket()
     {
         if (receivedData.Length != 9)
             return;
@@ -196,10 +215,7 @@ public class Client : MonoBehaviour
         if (!serverPacketAlreadyArrived.ContainsKey(idPacket))
         {
             int playerId = BitConverter.ToInt32(receivedData, 1);
-            if (OnPlayerDiePacketReceived != null)
-            {
-                OnPlayerDiePacketReceived(playerId);
-            }
+            destoryableObj[playerId].OnDestroyPacketReceived();
         }
         
         SendAck(idPacket);
