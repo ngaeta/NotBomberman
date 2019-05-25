@@ -13,103 +13,110 @@ public class Client : MonoBehaviour
         Join, ShootBomb, SpawnObj, SendVelocity, ReceivePos, ReceiveTimer, ReceiveDestroy, JoinAck, Ack
     }
 
+    const float DefaultTimeBeforeDeletePacket = 10f;
+
     public string Address = "192.168.3.194";
     public int Port = 9999;
 
-    public delegate void SpawnObject(byte idObjToSpawn, int idObj, Vector3 pos);
+    public delegate void SpawnObject(byte objType, int idObjSpawned, Vector3 pos);
     public static event SpawnObject OnSpawnPacketReceived;
 
-    private delegate void ReceiveOperations();
-    private Dictionary<Operation, ReceiveOperations> receiveCommands;
-    private Dictionary<int, Packet> packetNeedAck;
-    private Dictionary<int, bool> serverPacketAlreadyArrived;
+    private delegate void PacketOperation();
+    private Dictionary<Operation, PacketOperation> packetOperationHandler;
+    private Dictionary<int, Packet> packetsNeedAck;
+    private Dictionary<int, float> serverPacketsAlreadyArrived;
 
     private Dictionary<int, IPositionPacketHandler> positionableObj;
-    private Dictionary<int, ITimerPacketHandler> timerableObj;
-    private Dictionary<int, IDestroyPacketHandler> destoryableObj;
+    private Dictionary<int, ITimerPacketHandler> countdownableObj;
+    private Dictionary<int, IDestroyPacketHandler> destroyableObj;
     private IJoinPacketHandler clientJoin;
 
     private Socket socket;
     private EndPoint endPoint;
     private byte[] receivedData;
 
-    // Start is called before the first frame update
     void Start()
     {
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         socket.Blocking = false;
         endPoint = new IPEndPoint(IPAddress.Parse(Address), Port);
 
-        packetNeedAck = new Dictionary<int, Packet>();
-        serverPacketAlreadyArrived = new Dictionary<int, bool>();
+        packetsNeedAck = new Dictionary<int, Packet>();
+        serverPacketsAlreadyArrived = new Dictionary<int, float>();
         positionableObj = new Dictionary<int, IPositionPacketHandler>();
-        timerableObj = new Dictionary<int, ITimerPacketHandler>();
-        destoryableObj = new Dictionary<int, IDestroyPacketHandler>();
+        countdownableObj = new Dictionary<int, ITimerPacketHandler>();
+        destroyableObj = new Dictionary<int, IDestroyPacketHandler>();
 
-        receiveCommands = new Dictionary<Operation, ReceiveOperations>();
-        receiveCommands[Operation.SpawnObj] = ProcessSpawnPacket;
-        receiveCommands[Operation.ReceivePos] = ProcessPositionPacket;
-        receiveCommands[Operation.ReceiveTimer] = ProcessTimerPacket;
-        receiveCommands[Operation.ReceiveDestroy] = ProcessDestroyPacket;
-        receiveCommands[Operation.JoinAck] = JoinAckReceived;
-        receiveCommands[Operation.Ack] = AckReceived;
+        packetOperationHandler = new Dictionary<Operation, PacketOperation>();
+        packetOperationHandler[Operation.SpawnObj] = ProcessSpawnPacket;
+        packetOperationHandler[Operation.ReceivePos] = ProcessPositionPacket;
+        packetOperationHandler[Operation.ReceiveTimer] = ProcessTimerPacket;
+        packetOperationHandler[Operation.ReceiveDestroy] = ProcessDestroyPacket;
+        packetOperationHandler[Operation.JoinAck] = JoinAckReceived;
+        packetOperationHandler[Operation.Ack] = AckReceived;
     }
 
-    // Update is called once per frame
     void Update()
     {
         //Receive operations
         DequeuePackets();
-        if (receivedData != null && receiveCommands.ContainsKey((Operation)receivedData[0]))
+        if (receivedData != null && packetOperationHandler.ContainsKey((Operation)receivedData[0]))
         {
             Debug.Log("Pacchetto arrivato: ");
             PrintPacket(receivedData);
 
-            receiveCommands[(Operation)receivedData[0]]();
+            packetOperationHandler[(Operation)receivedData[0]]();
         }
 
         //Resend packet without ack
-        foreach (int id in packetNeedAck.Keys)
+        foreach (int id in packetsNeedAck.Keys)
         {
-            Packet packet = packetNeedAck[id];
-            if (packet.TimeRemainingToResend <= 0)
+            Packet packet = packetsNeedAck[id];
+            if (packet.RemainingTimeToResend <= 0)
             {
                 socket.SendTo(packet.GetData(), endPoint);
-                packet.ResetTimeRemaining();
+                packet.ResetRemainingTimeResend();
             }
             else
-                packet.TimeRemainingToResend -= Time.deltaTime;
+                packet.RemainingTimeToResend -= Time.deltaTime;
         }
 
-        //Keep in memory for n seconds before remove them
-        foreach (int id in serverPacketAlreadyArrived.Keys)
+        //Keep server packet in memory for n seconds before remove it, the ack could be not arrived.
+        int[] packetsId = new int[serverPacketsAlreadyArrived.Count];
+        serverPacketsAlreadyArrived.Keys.CopyTo(packetsId, 0);
+        foreach (int id in packetsId)
         {
+            float remainingTimeToDelete = serverPacketsAlreadyArrived[id] - Time.deltaTime;
+            if (remainingTimeToDelete <= 0)
+            {
+                serverPacketsAlreadyArrived.Remove(id);
+            }
+            else
+                serverPacketsAlreadyArrived[id] = remainingTimeToDelete;
         }
     }
 
-    public void Join(string playerName, IJoinPacketHandler clientJoin)
+    public void SendJoinPacket(string playerName, IJoinPacketHandler clientJoin)
     {
         this.clientJoin = clientJoin;
 
         byte command = (byte)Operation.Join;
-
         Packet joinPacket = new Packet(command, playerName);
         joinPacket.ResendAfter = 1f;
         socket.SendTo(joinPacket.GetData(), endPoint);
 
-        packetNeedAck.Add(joinPacket.Id, joinPacket);
+        packetsNeedAck.Add(joinPacket.Id, joinPacket);
         PrintPacket(joinPacket.GetData());
     }
 
     public void SendShootBombPacket(Vector3 position)
     {
         byte command = (byte)Operation.ShootBomb;
-
         Packet shootBombPacket = new Packet(command, position.x, position.y, position.z);
-        shootBombPacket.ResendAfter = .05f;
+        shootBombPacket.ResendAfter = .03f;
         socket.SendTo(shootBombPacket.GetData(), endPoint);
 
-        packetNeedAck.Add(shootBombPacket.Id, shootBombPacket);
+        packetsNeedAck.Add(shootBombPacket.Id, shootBombPacket);
         PrintPacket(shootBombPacket.GetData());
     }
 
@@ -122,6 +129,7 @@ public class Client : MonoBehaviour
 
         Packet setVelocityPacket = new Packet(command, x, y, z);
         socket.SendTo(setVelocityPacket.GetData(), endPoint);
+        PrintPacket(setVelocityPacket.GetData());
     }
 
     public bool RegisterObjPositionable(int id, IPositionPacketHandler positionable)
@@ -136,9 +144,9 @@ public class Client : MonoBehaviour
 
     public bool RegisterObjTimerable(int id, ITimerPacketHandler timerable)
     {
-        if (!timerableObj.ContainsKey(id))
+        if (!countdownableObj.ContainsKey(id))
         {
-            timerableObj.Add(id, timerable);
+            countdownableObj.Add(id, timerable);
             return true;
         }
         return false;
@@ -146,9 +154,9 @@ public class Client : MonoBehaviour
 
     public bool RegisterObjDestroyable(int id, IDestroyPacketHandler destroyable)
     {
-        if (!destoryableObj.ContainsKey(id))
+        if (!destroyableObj.ContainsKey(id))
         {
-            destoryableObj.Add(id, destroyable);
+            destroyableObj.Add(id, destroyable);
             return true;
         }
         return false;
@@ -161,10 +169,8 @@ public class Client : MonoBehaviour
 
         int idPacket = BitConverter.ToInt32(receivedData, 18);
 
-        if (!serverPacketAlreadyArrived.ContainsKey(idPacket))
+        if (!serverPacketsAlreadyArrived.ContainsKey(idPacket))
         {
-            serverPacketAlreadyArrived.Add(idPacket, true);
-
             byte idObjToSpawn = receivedData[1];
             int idObj = BitConverter.ToInt32(receivedData, 2);
             float x = BitConverter.ToSingle(receivedData, 6);
@@ -177,7 +183,8 @@ public class Client : MonoBehaviour
             }
         }
 
-        SendAck(idPacket);      
+        serverPacketsAlreadyArrived[idPacket] = DefaultTimeBeforeDeletePacket;     
+        SendAck(idPacket);
     }
 
     private void ProcessPositionPacket()
@@ -199,10 +206,11 @@ public class Client : MonoBehaviour
         if (receivedData.Length != 13)
             return;
 
-        int bombId = BitConverter.ToInt32(receivedData, 1);
-        float bombTimer = BitConverter.ToSingle(receivedData, 5);
+        int idObj = BitConverter.ToInt32(receivedData, 1);
+        float currTimer = BitConverter.ToSingle(receivedData, 5);
 
-        timerableObj[bombId].OnTimerPacketRecevied(bombTimer);
+        //Send ack does not necessary
+        countdownableObj[idObj].OnTimerPacketRecevied(currTimer);
     }
 
     private void ProcessDestroyPacket()
@@ -212,12 +220,13 @@ public class Client : MonoBehaviour
 
         int idPacket = BitConverter.ToInt32(receivedData, 5);
 
-        if (!serverPacketAlreadyArrived.ContainsKey(idPacket))
+        if (!serverPacketsAlreadyArrived.ContainsKey(idPacket))
         {
             int playerId = BitConverter.ToInt32(receivedData, 1);
-            destoryableObj[playerId].OnDestroyPacketReceived();
+            destroyableObj[playerId].OnDestroyPacketReceived();
         }
-        
+
+        serverPacketsAlreadyArrived[idPacket] = DefaultTimeBeforeDeletePacket;
         SendAck(idPacket);
     }
 
@@ -227,7 +236,7 @@ public class Client : MonoBehaviour
         if (receivedData.Length == 6)
         {
             int idPacket = BitConverter.ToInt32(receivedData, 2);
-            packetNeedAck.Remove(idPacket);
+            packetsNeedAck.Remove(idPacket);
             clientJoin.OnJoinPacketFailed();
             return;
         }
@@ -249,7 +258,7 @@ public class Client : MonoBehaviour
                 clientJoin.OnJoinPacketFailed();
 
             int idPacket = BitConverter.ToInt32(receivedData, 18);
-            packetNeedAck.Remove(idPacket);
+            packetsNeedAck.Remove(idPacket);
         }
     }
 
@@ -259,8 +268,8 @@ public class Client : MonoBehaviour
             return;
 
         int idPacket = BitConverter.ToInt32(receivedData, 1);
-        if (packetNeedAck.ContainsKey(idPacket))
-            packetNeedAck.Remove(idPacket);
+        if (packetsNeedAck.ContainsKey(idPacket))
+            packetsNeedAck.Remove(idPacket);
     }
 
     private void SendAck(int packetId)
