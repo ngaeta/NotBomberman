@@ -5,8 +5,7 @@ using System.IO;
 public class Packet
 {
     public int Id { get; private set; }
-    public int NumTimesToSend { get; set; }
-    public float TimeRemainingToResend { get; set; }
+    public float RemainingTimeToResend { get; set; }
 
     private float timeToResend;
     public float ResendAfter
@@ -14,7 +13,7 @@ public class Packet
         set
         {
             timeToResend = value;
-            TimeRemainingToResend = value;
+            RemainingTimeToResend = value;
         }
     }
 
@@ -27,7 +26,6 @@ public class Packet
         stream = new MemoryStream();
         writer = new BinaryWriter(stream);
         Id = ++packetCounter;
-        NumTimesToSend = 0;
         ResendAfter = 0.05f;
     }
 
@@ -73,8 +71,8 @@ public class Packet
         return stream.ToArray();
     }
 
-    public void ResetTimeRemaining()
+    public void ResetRemainingTimeResend()
     {
-        TimeRemainingToResend = timeToResend;
+        RemainingTimeToResend = timeToResend;
     }
 }

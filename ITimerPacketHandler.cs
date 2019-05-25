@@ -4,5 +4,5 @@ using UnityEngine;
 
 public interface ITimerPacketHandler
 {
-    void OnTimerPacketRecevied(float newTimer);
+    void OnTimerPacketRecevied(float currTimer);
 }
