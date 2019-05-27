@@ -35,7 +35,7 @@ public class Client : MonoBehaviour
     private EndPoint endPoint;
     private byte[] receivedData;
 
-    void Start()
+    void Awake()
     {
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         socket.Blocking = false;
@@ -176,6 +176,7 @@ public class Client : MonoBehaviour
             float x = BitConverter.ToSingle(receivedData, 6);
             float y = BitConverter.ToSingle(receivedData, 10);
             float z = BitConverter.ToSingle(receivedData, 14);
+            Debug.Log("Obj to spawn " + idObjToSpawn + " Id obj: " + idObj + " X: " + x + " Y: " + y + " Z: " + z);
 
             if (OnSpawnPacketReceived != null)
             {
@@ -196,6 +197,7 @@ public class Client : MonoBehaviour
         float x = BitConverter.ToSingle(receivedData, 5);
         float y = BitConverter.ToSingle(receivedData, 9);
         float z = BitConverter.ToSingle(receivedData, 13);
+        Debug.Log("Id obj: " + id + " X: " + x + " Y: " + y + " Z: " + z);
 
         //Send ack does not necessary
         positionableObj[id].OnPositionPacketReceived(x, y, z);
@@ -208,6 +210,7 @@ public class Client : MonoBehaviour
 
         int idObj = BitConverter.ToInt32(receivedData, 1);
         float currTimer = BitConverter.ToSingle(receivedData, 5);
+        Debug.Log("Id obj: " + idObj + " Timer: " + currTimer);
 
         //Send ack does not necessary
         countdownableObj[idObj].OnTimerPacketRecevied(currTimer);
@@ -224,6 +227,7 @@ public class Client : MonoBehaviour
         {
             int playerId = BitConverter.ToInt32(receivedData, 1);
             destroyableObj[playerId].OnDestroyPacketReceived();
+            Debug.Log("Id player: " + playerId);
         }
 
         serverPacketsAlreadyArrived[idPacket] = DefaultTimeBeforeDeletePacket;
@@ -236,29 +240,38 @@ public class Client : MonoBehaviour
         if (receivedData.Length == 6)
         {
             int idPacket = BitConverter.ToInt32(receivedData, 2);
-            packetsNeedAck.Remove(idPacket);
-            clientJoin.OnJoinPacketFailed();
+            if (!serverPacketsAlreadyArrived.ContainsKey(idPacket))
+            {
+                packetsNeedAck.Remove(idPacket);
+                serverPacketsAlreadyArrived.Add(idPacket, DefaultTimeBeforeDeletePacket);
+                clientJoin.OnJoinPacketFailed();              
+            }
             return;
         }
 
         //join succes packet [command, 1, idPlayer, x, y, z, idPacket]
         if (receivedData.Length == 22)
         {
-            bool isJoined = receivedData[1] == 1;
-            if (isJoined)
-            {
-                int idPlayer = BitConverter.ToInt32(receivedData, 2);
-                float x = BitConverter.ToSingle(receivedData, 6);
-                float y = BitConverter.ToSingle(receivedData, 10);
-                float z = BitConverter.ToSingle(receivedData, 14);
-
-                clientJoin.OnJoinPacketSucces(idPlayer, new Vector3(x, y, z));
-            }
-            else
-                clientJoin.OnJoinPacketFailed();
-
             int idPacket = BitConverter.ToInt32(receivedData, 18);
-            packetsNeedAck.Remove(idPacket);
+            if (!serverPacketsAlreadyArrived.ContainsKey(idPacket))
+            {
+                bool isJoined = receivedData[1] == 1;
+                if (isJoined)
+                {
+                    int idPlayer = BitConverter.ToInt32(receivedData, 2);
+                    float x = BitConverter.ToSingle(receivedData, 6);
+                    float y = BitConverter.ToSingle(receivedData, 10);
+                    float z = BitConverter.ToSingle(receivedData, 14);
+
+                    Debug.Log("Id player: " + idPlayer + " X: " + x + " Y: " + y + " Z: " + z);
+                    clientJoin.OnJoinPacketSucces(idPlayer, new Vector3(x, y, z));
+                }
+                else
+                    clientJoin.OnJoinPacketFailed();
+
+                packetsNeedAck.Remove(idPacket);
+                serverPacketsAlreadyArrived.Add(idPacket, DefaultTimeBeforeDeletePacket);
+            }       
         }
     }
 
