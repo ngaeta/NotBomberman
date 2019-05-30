@@ -21,16 +21,15 @@ public class Client : MonoBehaviour
     public delegate void SpawnObject(byte objType, int idObjSpawned, Vector3 pos);
     public static event SpawnObject OnSpawnPacketReceived;
 
+    private static Dictionary<int, IPositionPacketHandler> positionableObj;
+    private static Dictionary<int, ITimerPacketHandler> countdownableObj;
+    private static Dictionary<int, IDestroyPacketHandler> destroyableObj;
+    private static IJoinPacketHandler clientJoin;
+
     private delegate void PacketOperation();
     private Dictionary<Operation, PacketOperation> packetOperationHandler;
     private Dictionary<int, Packet> packetsNeedAck;
     private Dictionary<int, float> serverPacketsAlreadyArrived;
-
-    private Dictionary<int, IPositionPacketHandler> positionableObj;
-    private Dictionary<int, ITimerPacketHandler> countdownableObj;
-    private Dictionary<int, IDestroyPacketHandler> destroyableObj;
-    private IJoinPacketHandler clientJoin;
-
     private Socket socket;
     private EndPoint endPoint;
     private byte[] receivedData;
@@ -96,9 +95,9 @@ public class Client : MonoBehaviour
         }
     }
 
-    public void SendJoinPacket(string playerName, IJoinPacketHandler clientJoin)
+    public void SendJoinPacket(string playerName, IJoinPacketHandler joinHandler)
     {
-        this.clientJoin = clientJoin;
+        clientJoin = joinHandler;
 
         byte command = (byte)Operation.Join;
         Packet joinPacket = new Packet(command, playerName);
@@ -132,7 +131,7 @@ public class Client : MonoBehaviour
         PrintPacket(setVelocityPacket.GetData());
     }
 
-    public bool RegisterObjPositionable(int id, IPositionPacketHandler positionable)
+    public static bool RegisterObjPositionable(int id, IPositionPacketHandler positionable)
     {
         if (!positionableObj.ContainsKey(id))
         {
@@ -142,7 +141,7 @@ public class Client : MonoBehaviour
         return false;
     }
 
-    public bool RegisterObjTimerable(int id, ITimerPacketHandler timerable)
+    public static bool RegisterObjTimerable(int id, ITimerPacketHandler timerable)
     {
         if (!countdownableObj.ContainsKey(id))
         {
@@ -152,7 +151,7 @@ public class Client : MonoBehaviour
         return false;
     }
 
-    public bool RegisterObjDestroyable(int id, IDestroyPacketHandler destroyable)
+    public static bool RegisterObjDestroyable(int id, IDestroyPacketHandler destroyable)
     {
         if (!destroyableObj.ContainsKey(id))
         {
@@ -162,7 +161,7 @@ public class Client : MonoBehaviour
         return false;
     }
 
-    public void UnregisterObject(int id)
+    public static void UnregisterObject(int id)
     {
         if(positionableObj.ContainsKey(id)) positionableObj.Remove(id);
         if(countdownableObj.ContainsKey(id)) countdownableObj.Remove(id);
