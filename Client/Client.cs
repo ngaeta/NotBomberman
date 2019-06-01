@@ -10,12 +10,13 @@ public class Client : MonoBehaviour
 {
     enum Operation : byte
     {
-        Join, ShootBomb, SpawnObj, SendVelocity, ReceivePos, ReceiveTimer, ReceiveDestroy, JoinAck, Ack
+        Join, ShootBomb, SpawnObj, SendVelocity, ReceivePos, ReceiveTimer, ReceiveDestroy, JoinAck, Ack, Alive
     }
 
-    const float DefaultTimeBeforeDeletePacket = 10f;
+    const float DefaultTimeBeforeDeletePacket = 15f;
+    const float SendTimePacketAlive = 4f;
 
-    public string Address = "192.168.3.194";
+    public string Address = "79.37.15.73";
     public int Port = 9999;
 
     public delegate void SpawnObject(byte objType, int idObjSpawned, Vector3 pos);
@@ -30,6 +31,7 @@ public class Client : MonoBehaviour
     private Dictionary<Operation, PacketOperation> packetOperationHandler;
     private Dictionary<int, Packet> packetsNeedAck;
     private Dictionary<int, float> serverPacketsAlreadyArrived;
+    private Packet packetAlive;
     private Socket socket;
     private EndPoint endPoint;
     private byte[] receivedData;
@@ -39,6 +41,8 @@ public class Client : MonoBehaviour
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         socket.Blocking = false;
         endPoint = new IPEndPoint(IPAddress.Parse(Address), Port);
+        packetAlive = new Packet((byte) Operation.Alive);
+        packetAlive.ResendAfter = SendTimePacketAlive;
 
         packetsNeedAck = new Dictionary<int, Packet>();
         serverPacketsAlreadyArrived = new Dictionary<int, float>();
@@ -60,10 +64,7 @@ public class Client : MonoBehaviour
         //Receive operations
         DequeuePackets();
         if (receivedData != null && packetOperationHandler.ContainsKey((Operation)receivedData[0]))
-        {
-            Debug.Log("Pacchetto arrivato: ");
-            PrintPacket(receivedData);
-
+        { 
             packetOperationHandler[(Operation)receivedData[0]]();
         }
 
@@ -93,6 +94,15 @@ public class Client : MonoBehaviour
             else
                 serverPacketsAlreadyArrived[id] = remainingTimeToDelete;
         }
+
+        //Sending packet every n seconds otherwise the server will think that the connection has fallen.
+        if (packetAlive.RemainingTimeToResend <= 0)
+        {
+            socket.SendTo(packetAlive.GetData(), endPoint);
+            packetAlive.ResetRemainingTimeResend();
+        }
+        else
+            packetAlive.RemainingTimeToResend -= Time.deltaTime;
     }
 
     public void SendJoinPacket(string playerName, IJoinPacketHandler joinHandler)
@@ -101,22 +111,21 @@ public class Client : MonoBehaviour
 
         byte command = (byte)Operation.Join;
         Packet joinPacket = new Packet(command, playerName);
-        joinPacket.ResendAfter = 1f;
+        joinPacket.ResendAfter = 3f;
         socket.SendTo(joinPacket.GetData(), endPoint);
 
         packetsNeedAck.Add(joinPacket.Id, joinPacket);
-        PrintPacket(joinPacket.GetData());
     }
 
     public void SendShootBombPacket(Vector3 position)
     {
         byte command = (byte)Operation.ShootBomb;
         Packet shootBombPacket = new Packet(command, position.x, position.y, position.z);
-        shootBombPacket.ResendAfter = .03f;
+        shootBombPacket.ResendAfter = 0.2f;
         socket.SendTo(shootBombPacket.GetData(), endPoint);
+        Debug.Log("shoot bomb packet id: " + shootBombPacket.Id);
 
         packetsNeedAck.Add(shootBombPacket.Id, shootBombPacket);
-        PrintPacket(shootBombPacket.GetData());
     }
 
     public void SendVelocityPacket(Vector3 velocity)
@@ -125,10 +134,9 @@ public class Client : MonoBehaviour
         float x = velocity.x;
         float y = velocity.y;
         float z = velocity.z;
-
         Packet setVelocityPacket = new Packet(command, x, y, z);
+        Debug.Log("Velocity packet with id: " + setVelocityPacket.Id);
         socket.SendTo(setVelocityPacket.GetData(), endPoint);
-        PrintPacket(setVelocityPacket.GetData());
     }
 
     public static bool RegisterObjPositionable(int id, IPositionPacketHandler positionable)
@@ -170,10 +178,15 @@ public class Client : MonoBehaviour
 
     private void ProcessSpawnPacket()
     {
+        Debug.Log("SPAWN PACKET");
         if (receivedData.Length != 22)
+        {
+            Debug.Log("lUNGHEZZA SBAGLIATA");
             return;
+        }
 
         int idPacket = BitConverter.ToInt32(receivedData, 18);
+        Debug.Log("SPAWN id PACKET " + idPacket);
 
         if (!serverPacketsAlreadyArrived.ContainsKey(idPacket))
         {
@@ -203,7 +216,7 @@ public class Client : MonoBehaviour
         float x = BitConverter.ToSingle(receivedData, 5);
         float y = BitConverter.ToSingle(receivedData, 9);
         float z = BitConverter.ToSingle(receivedData, 13);
-        Debug.Log("Id obj: " + id + " X: " + x + " Y: " + y + " Z: " + z);
+        Debug.Log("Position packet received with id: " + BitConverter.ToSingle(receivedData, 14));
 
         //Send ack does not necessary
         positionableObj[id].OnPositionPacketReceived(x, y, z);
@@ -216,8 +229,8 @@ public class Client : MonoBehaviour
 
         int idObj = BitConverter.ToInt32(receivedData, 1);
         float currTimer = BitConverter.ToSingle(receivedData, 5);
-        Debug.Log("Id obj: " + idObj + " Timer: " + currTimer);
 
+        Debug.Log("Timer packet with id: " + BitConverter.ToInt32(receivedData, 9));
         //Send ack does not necessary
         countdownableObj[idObj].OnTimerPacketRecevied(currTimer);
     }
@@ -255,10 +268,10 @@ public class Client : MonoBehaviour
             return;
         }
 
-        //join succes packet [command, 1, idPlayer, x, y, z, idPacket]
-        if (receivedData.Length == 22)
+        //join succes packet [command, 1, idPlayer, x, y, z, textureToUse, idPacket]
+        if (receivedData.Length == 23)
         {
-            int idPacket = BitConverter.ToInt32(receivedData, 18);
+            int idPacket = BitConverter.ToInt32(receivedData, 19);
             if (!serverPacketsAlreadyArrived.ContainsKey(idPacket))
             {
                 bool isJoined = receivedData[1] == 1;
@@ -269,8 +282,7 @@ public class Client : MonoBehaviour
                     float y = BitConverter.ToSingle(receivedData, 10);
                     float z = BitConverter.ToSingle(receivedData, 14);
 
-                    Debug.Log("Id player: " + idPlayer + " X: " + x + " Y: " + y + " Z: " + z);
-                    clientJoin.OnJoinPacketSucces(idPlayer, new Vector3(x, y, z));
+                    clientJoin.OnJoinPacketSucces(idPlayer, new Vector3(x, y, z), receivedData[18]);
                 }
                 else
                     clientJoin.OnJoinPacketFailed();
@@ -287,6 +299,7 @@ public class Client : MonoBehaviour
             return;
 
         int idPacket = BitConverter.ToInt32(receivedData, 1);
+        Debug.Log("Ack received for packet: " + idPacket);
         if (packetsNeedAck.ContainsKey(idPacket))
             packetsNeedAck.Remove(idPacket);
     }
