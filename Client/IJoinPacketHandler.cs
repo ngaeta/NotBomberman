@@ -4,6 +4,6 @@ using UnityEngine;
 
 public interface IJoinPacketHandler
 {
-    void OnJoinPacketSucces(int id, Vector3 pos);
+    void OnJoinPacketSucces(int id, Vector3 pos, byte texture);
     void OnJoinPacketFailed();
 }
