@@ -10,17 +10,20 @@ public class Client : MonoBehaviour
 {
     enum Operation : byte
     {
-        Join, ShootBomb, SpawnObj, SendVelocity, ReceivePos, ReceiveTimer, ReceiveDestroy, JoinAck, Ack, Alive
+        Join, ShootBomb, SpawnBomb, SpawnPlayerOpponent, SendVelocity,
+        ReceivePos, ReceiveTimer, ReceiveDestroy, JoinAck, Ack, Alive
     }
 
     const float DefaultTimeBeforeDeletePacket = 15f;
-    const float SendTimePacketAlive = 4f;
+    const float LoopTimeAlivePacket = 4f;
 
     public string Address = "79.37.15.73";
     public int Port = 9999;
 
-    public delegate void SpawnObject(byte objType, int idObjSpawned, Vector3 pos);
-    public static event SpawnObject OnSpawnPacketReceived;
+    public delegate void SpawnBomb(int bombID, Vector3 pos, float radius, float startTimer);
+    public static event SpawnBomb OnSpawnBombPacketReceived;
+    public delegate void SpawnPlayerOpponents(int playerID, Vector3 pos, byte color, string name);
+    public static event SpawnPlayerOpponents OnSpawnPlayersPacketReceived;
 
     private static Dictionary<int, IPositionPacketHandler> positionableObj;
     private static Dictionary<int, ITimerPacketHandler> countdownableObj;
@@ -31,7 +34,7 @@ public class Client : MonoBehaviour
     private Dictionary<Operation, PacketOperation> packetOperationHandler;
     private Dictionary<int, Packet> packetsNeedAck;
     private Dictionary<int, float> serverPacketsAlreadyArrived;
-    private Packet packetAlive;
+    private Packet alivePacket;
     private Socket socket;
     private EndPoint endPoint;
     private byte[] receivedData;
@@ -41,8 +44,8 @@ public class Client : MonoBehaviour
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         socket.Blocking = false;
         endPoint = new IPEndPoint(IPAddress.Parse(Address), Port);
-        packetAlive = new Packet((byte) Operation.Alive);
-        packetAlive.ResendAfter = SendTimePacketAlive;
+        alivePacket = new Packet((byte) Operation.Alive);
+        alivePacket.ResendAfter = LoopTimeAlivePacket;
 
         packetsNeedAck = new Dictionary<int, Packet>();
         serverPacketsAlreadyArrived = new Dictionary<int, float>();
@@ -51,7 +54,8 @@ public class Client : MonoBehaviour
         destroyableObj = new Dictionary<int, IDestroyPacketHandler>();
 
         packetOperationHandler = new Dictionary<Operation, PacketOperation>();
-        packetOperationHandler[Operation.SpawnObj] = ProcessSpawnPacket;
+        packetOperationHandler[Operation.SpawnBomb] = ProcessSpawnBombPacket;
+        packetOperationHandler[Operation.SpawnPlayerOpponent] = ProcessSpawnPlayerOpponentPacket;
         packetOperationHandler[Operation.ReceivePos] = ProcessPositionPacket;
         packetOperationHandler[Operation.ReceiveTimer] = ProcessTimerPacket;
         packetOperationHandler[Operation.ReceiveDestroy] = ProcessDestroyPacket;
@@ -96,13 +100,13 @@ public class Client : MonoBehaviour
         }
 
         //Sending packet every n seconds otherwise the server will think that the connection has fallen.
-        if (packetAlive.RemainingTimeToResend <= 0)
+        if (alivePacket.RemainingTimeToResend <= 0)
         {
-            socket.SendTo(packetAlive.GetData(), endPoint);
-            packetAlive.ResetRemainingTimeResend();
+            socket.SendTo(alivePacket.GetData(), endPoint);
+            alivePacket.ResetRemainingTimeResend();
         }
         else
-            packetAlive.RemainingTimeToResend -= Time.deltaTime;
+            alivePacket.RemainingTimeToResend -= Time.deltaTime;
     }
 
     public void SendJoinPacket(string playerName, IJoinPacketHandler joinHandler)
@@ -151,6 +155,7 @@ public class Client : MonoBehaviour
 
     public static bool RegisterObjTimerable(int id, ITimerPacketHandler timerable)
     {
+        Debug.Log("Registerred with id: " + id);
         if (!countdownableObj.ContainsKey(id))
         {
             countdownableObj.Add(id, timerable);
@@ -176,34 +181,60 @@ public class Client : MonoBehaviour
         if(destroyableObj.ContainsKey(id)) destroyableObj.Remove(id);
     }
 
-    private void ProcessSpawnPacket()
+    private void ProcessSpawnBombPacket()
     {
-        Debug.Log("SPAWN PACKET");
-        if (receivedData.Length != 22)
+        Debug.Log("BOMB SPAWN PACKET");
+        if (receivedData.Length != 29)
         {
-            Debug.Log("lUNGHEZZA SBAGLIATA");
+            Debug.Log("LUNGHEZZA SBAGLIATA");
             return;
         }
 
-        int idPacket = BitConverter.ToInt32(receivedData, 18);
+        int idPacket = BitConverter.ToInt32(receivedData, 25);
         Debug.Log("SPAWN id PACKET " + idPacket);
 
         if (!serverPacketsAlreadyArrived.ContainsKey(idPacket))
         {
-            byte idObjToSpawn = receivedData[1];
-            int idObj = BitConverter.ToInt32(receivedData, 2);
-            float x = BitConverter.ToSingle(receivedData, 6);
-            float y = BitConverter.ToSingle(receivedData, 10);
-            float z = BitConverter.ToSingle(receivedData, 14);
-            Debug.Log("Obj to spawn " + idObjToSpawn + " Id obj: " + idObj + " X: " + x + " Y: " + y + " Z: " + z);
+            int bombID = BitConverter.ToInt32(receivedData, 1);
+            float x = BitConverter.ToSingle(receivedData, 5);
+            float y = BitConverter.ToSingle(receivedData, 9);
+            float z = BitConverter.ToSingle(receivedData, 13);
+            float radius = BitConverter.ToSingle(receivedData, 17);
+            float startTimer = BitConverter.ToSingle(receivedData, 21);
 
-            if (OnSpawnPacketReceived != null)
-            {
-                OnSpawnPacketReceived(idObjToSpawn, idObj, new Vector3(x, y, z));
-            }
+            OnSpawnBombPacketReceived?.Invoke(bombID, new Vector3(x, y, z), radius, startTimer);
         }
 
         serverPacketsAlreadyArrived[idPacket] = DefaultTimeBeforeDeletePacket;     
+        SendAck(idPacket);
+    }
+
+    private void ProcessSpawnPlayerOpponentPacket()
+    {
+        Debug.Log("OPPONENT SPAWN PACKET");
+        //name parameters is at most 10 bytes(10 chars)
+        if (receivedData.Length != 32)
+        {
+            Debug.Log("LUNGHEZZA SBAGLIATA");
+            return;
+        }
+
+        int idPacket = BitConverter.ToInt32(receivedData, 28);
+        Debug.Log("SPAWN id PACKET " + idPacket);
+
+        if (!serverPacketsAlreadyArrived.ContainsKey(idPacket))
+        {
+            int playerID = BitConverter.ToInt32(receivedData, 1);
+            float x = BitConverter.ToSingle(receivedData, 5);
+            float y = BitConverter.ToSingle(receivedData, 9);
+            float z = BitConverter.ToSingle(receivedData, 13);
+            byte textureToApply = receivedData[17];
+            string name = BitConverter.ToString(receivedData, 18);
+
+            OnSpawnPlayersPacketReceived?.Invoke(playerID, new Vector3(x, y, z), textureToApply, name);
+        }
+
+        serverPacketsAlreadyArrived[idPacket] = DefaultTimeBeforeDeletePacket;
         SendAck(idPacket);
     }
 
