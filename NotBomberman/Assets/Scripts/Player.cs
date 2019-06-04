@@ -5,8 +5,9 @@ using UnityEngine;
 public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler, IDestroyPacketHandler
 {
     public float Speed;
-    public string Name = "Player 1";
+    public string Name = "Nicola";
     public string TexturesPath = "Textures/BombermanTexture";
+    public float InputRate = 0.25f;
     public Client Client;
     public ScoreMng Score;
     public Renderer Renderer;
@@ -15,6 +16,7 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
     private int id;
     private bool isAlive;
     private bool joinSuccess;
+    private float inputRate;
     private Vector3 velocity;
     private Animator anim;
 
@@ -23,8 +25,9 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
         anim = GetComponent<Animator>();
         isAlive = true;
         joinSuccess = false;
-
+        Debug.Log(Name);
         Client.SendJoinPacket(Name, this);
+        Renderer.gameObject.SetActive(false);
         //Invoke("OnDestroyPacketReceived", 2f);
     }
 
@@ -32,10 +35,11 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
     {
         if (joinSuccess)
         {
-            if (isAlive)
+            if (isAlive && inputRate <= 0)
             {
                 if (Input.GetKey(KeyCode.W))
                 {
+                    inputRate = InputRate;
                     velocity = new Vector3(0, 0, Speed);
                     anim.SetBool("Walk", true);
                     transform.rotation = Quaternion.Euler(Vector3.zero);
@@ -43,6 +47,7 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
                 }
                 else if (Input.GetKey(KeyCode.S))
                 {
+                    inputRate = InputRate;
                     velocity = new Vector3(0, 0, -Speed);
                     anim.SetBool("Walk", true);
                     transform.rotation = Quaternion.Euler(0, -180, 0);
@@ -50,6 +55,7 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
                 }
                 else if (Input.GetKey(KeyCode.A))
                 {
+                    inputRate = InputRate;
                     velocity = new Vector3(-Speed, 0, 0);
                     anim.SetBool("Walk", true);
                     transform.rotation = Quaternion.Euler(0, -90, 0);
@@ -57,6 +63,7 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
                 }
                 else if (Input.GetKey(KeyCode.D))
                 {
+                    inputRate = InputRate;
                     velocity = new Vector3(Speed, 0, 0);
                     anim.SetBool("Walk", true);
                     transform.rotation = Quaternion.Euler(0, 90, 0);
@@ -73,6 +80,8 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
                     Client.SendShootBombPacket(transform.position);
                 }
             }
+            else
+                inputRate -= Time.deltaTime;
         }
     }
 
@@ -84,6 +93,8 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
         transform.position = pos;
         Texture tex = Resources.Load<Texture>(TexturesPath + textureToApply);
         Renderer.material.SetTexture("_MainTex", tex);
+        Renderer.gameObject.SetActive(true);
+
         Score.SetNextPlayerUI(Name, textureToApply);
 
         Client.RegisterObjPositionable(this.id, this);
@@ -102,14 +113,18 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
         transform.position = new Vector3(x, y, z);
     }
 
-    public void OnDestroyPacketReceived()
+    public void OnDestroyPacketReceived(string playerKilledYou)
     {
         isAlive = false;
         Instantiate(DeathEffect, transform.position, Quaternion.identity);
+
+        playerKilledYou = playerKilledYou.TrimEnd();
+        Score.SetPlayerStatus(Name);
+        string gameOverText = (playerKilledYou == Name) ? "You killed yourself" : playerKilledYou + " killed you";
+        Score.SetGameOverText(gameOverText);
+
         Client.UnregisterObject(id);
-
         Destroy(gameObject);
-
-        Application.Quit();
+        //Application.Quit();
     } 
 }

@@ -6,16 +6,32 @@ public class OpponentPlayer : MonoBehaviour, ISpawnable, IPositionPacketHandler,
 {
     public Renderer Renderer;
     public string TexturesPath = "Textures/BombermanTexture";
+    public float TimeSinceLastPosPcktToReturnIdle = 0.35f;
     public GameObject DeathEffect;
+    public ScoreMng ScoreMng;
 
     private int id;
     private Animator anim;
     private string playerName;
+    private float timeSinceLastPositionPacket;
 
     void Start()
     {
         anim = GetComponent<Animator>();
         //Invoke("OnDestroyPacketReceived", 2f);
+    }
+
+    void Update()
+    {
+        if (anim.GetBool("Walk"))
+        {
+            if (timeSinceLastPositionPacket <= 0)
+            {
+                anim.SetBool("Walk", false);
+            }
+            else
+                timeSinceLastPositionPacket -= Time.deltaTime;
+        }
     }
 
     public void Spawn(int id, Vector3 pos, params object[] properties)
@@ -35,23 +51,37 @@ public class OpponentPlayer : MonoBehaviour, ISpawnable, IPositionPacketHandler,
     public void OnPositionPacketReceived(float x, float y, float z)
     {
         Vector3 newPos = new Vector3(x, y, z);
-        if (transform.position - newPos != Vector3.zero)
-        {
-            transform.rotation = Quaternion.LookRotation(newPos);
-            transform.position = newPos;
-            anim.SetBool("Walk", true);
-        }
-        else
-        {
-            anim.SetBool("Walk", false);
-        }
+        SetRotation(newPos);
+        transform.position = newPos;
+        anim.SetBool("Walk", true);
+        timeSinceLastPositionPacket = TimeSinceLastPosPcktToReturnIdle;
     }
 
-    public void OnDestroyPacketReceived()
+    public void OnDestroyPacketReceived(string name)
     {
         Instantiate(DeathEffect, transform.position, Quaternion.identity);
         Client.UnregisterObject(id);
 
         Destroy(gameObject);
+    }
+
+    private void SetRotation(Vector3 newPos)
+    {
+        if (newPos.z < transform.position.z)
+        {
+            transform.rotation = Quaternion.Euler(0, -180, 0);
+        }
+        else if (newPos.z > transform.position.z)
+        {
+            transform.rotation = Quaternion.Euler(Vector3.zero);
+        }
+        else if (newPos.x < transform.position.x)
+        {
+            transform.rotation = Quaternion.Euler(0, -90, 0);
+        }
+        else
+        {
+            transform.rotation = Quaternion.Euler(0, 90, 0);
+        }
     }
 }

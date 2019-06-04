@@ -2,22 +2,17 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 public class ScoreMng : MonoBehaviour
 {
+    public GameObject[] PlayersPanel;
     public Text[] PlayersName;
     public Image[] PlayersImage;
+    public Text[] PlayersStatus;
+    public TMP_Text GameOverTMPro;
+    public GameObject WaitingText;
     public string SpritePath = "Textures/BombermanSprite";
-
-    public Text Player1TextVal;
-    public Text Player2TextVal;
-    public Text Player3TextVal;
-    public Text Player4TextVal;
-
-    public int Player1Score;
-    public int Player2Score;
-    public int Player3Score;
-    public int Player4Score;
 
     private int nextUIElement;
 
@@ -26,25 +21,40 @@ public class ScoreMng : MonoBehaviour
         Client.OnSpawnPlayersPacketReceived += OnPlayerSpawn;
     }
 
-    void Update()
-    {
-        //Player1TextVal.text = Player1Score.ToString("00");
-        //Player2TextVal.text = Player2Score.ToString("00");
-        //Player3TextVal.text = Player3Score.ToString("00");
-        //Player4TextVal.text = Player4Score.ToString("00");
-    }
-
     void OnPlayerSpawn(int id, Vector3 pos, byte textureToApply, string name)
     {
-        SetNextPlayerUI(name, textureToApply);
+        SetNextPlayerUI(name.TrimEnd(), textureToApply);
     }
 
     public void SetNextPlayerUI(string name, byte spriteToApply)
     {
+        if (WaitingText.activeSelf)
+            WaitingText.SetActive(false);
+
         Sprite sprite = Resources.Load<Sprite>(SpritePath + spriteToApply);
+        PlayersPanel[nextUIElement].SetActive(true);
         PlayersImage[nextUIElement].sprite = sprite;
         PlayersImage[nextUIElement].gameObject.SetActive(true);
         PlayersName[nextUIElement].text = name;
         nextUIElement++;
+    }
+
+    public void SetGameOverText(string text)
+    {
+        GameOverTMPro.text = text;
+        GameOverTMPro.gameObject.SetActive(true);
+    }
+
+    public void SetPlayerStatus(string playerName)
+    {
+        for(int i=0; i < PlayersName.Length; i++)
+        {
+            if(PlayersName[i].text == playerName)
+            {
+                PlayersStatus[i].text = "Dead";
+                PlayersStatus[i].color = Color.red;
+                return;
+            }
+        }
     }
 }

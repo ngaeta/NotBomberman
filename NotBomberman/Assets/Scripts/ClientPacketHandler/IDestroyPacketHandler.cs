@@ -4,5 +4,5 @@ using UnityEngine;
 
 public interface IDestroyPacketHandler 
 {
-    void OnDestroyPacketReceived();
+    void OnDestroyPacketReceived(string playerKilledYou);
 }

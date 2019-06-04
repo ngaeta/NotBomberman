@@ -253,7 +253,10 @@ public class Client : MonoBehaviour
         Debug.Log("Position packet received with id: " + BitConverter.ToSingle(receivedData, 14));
 
         //Send ack does not necessary
-        positionableObj[id].OnPositionPacketReceived(x, y, z);
+        if (positionableObj.ContainsKey(id))
+        {
+            positionableObj[id].OnPositionPacketReceived(x, y, z);
+        }
     }
 
     private void ProcessTimerPacket()
@@ -266,21 +269,29 @@ public class Client : MonoBehaviour
 
         Debug.Log("Timer packet with id: " + BitConverter.ToInt32(receivedData, 9));
         //Send ack does not necessary
-        countdownableObj[idObj].OnTimerPacketRecevied(currTimer);
+        if (countdownableObj.ContainsKey(idObj))
+        {
+            countdownableObj[idObj].OnTimerPacketRecevied(currTimer);
+        }
     }
 
     private void ProcessDestroyPacket()
     {
-        if (receivedData.Length != 9)
+        if (receivedData.Length != 19)
             return;
 
-        int idPacket = BitConverter.ToInt32(receivedData, 5);
+        int idPacket = BitConverter.ToInt32(receivedData, 15);
 
         if (!serverPacketsAlreadyArrived.ContainsKey(idPacket))
         {
             int playerId = BitConverter.ToInt32(receivedData, 1);
-            destroyableObj[playerId].OnDestroyPacketReceived();
-            Debug.Log("Id player: " + playerId);
+            string playerKilledYou = Encoding.UTF8.GetString(receivedData, 5, 10);
+            Debug.Log(playerKilledYou);
+
+            if (destroyableObj.ContainsKey(playerId))
+            {
+                destroyableObj[playerId].OnDestroyPacketReceived(playerKilledYou);
+            }
         }
 
         serverPacketsAlreadyArrived[idPacket] = DefaultTimeBeforeDeletePacket;
