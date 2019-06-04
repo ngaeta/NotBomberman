@@ -1,17 +1,26 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 public class Bomb : MonoBehaviour, ITimerPacketHandler, ISpawnable
 {
     public GameObject Explosion;
+    public GameObject TextMeshProObj;
 
     public bool DebugStartCountDown = false;
 
     private Animator anim;
+    private TMP_Text textPro;
     private int id;
     private float radius = 1f;
-    private float currTimer = 3f;
+    private float currTimer = 3f; 
+    private float ceilCurrTimer;
+
+    void Start()
+    {
+        textPro = TextMeshProObj.GetComponent<TMP_Text>();
+    }
 
     void Update()
     {
@@ -35,7 +44,9 @@ public class Bomb : MonoBehaviour, ITimerPacketHandler, ISpawnable
 
         anim = GetComponent<Animator>(); //Spawn is called before start???
         anim.SetBool("IsActive", true);
-        
+        ceilCurrTimer = Mathf.Ceil(currTimer);
+        textPro.text = ceilCurrTimer.ToString();
+
         Client.RegisterObjTimerable(id, this);
     }
 
@@ -50,7 +61,8 @@ public class Bomb : MonoBehaviour, ITimerPacketHandler, ISpawnable
         }
         else
         {
-            //Set UI with Mathf.Ceil(currTimer) value
+            ceilCurrTimer = Mathf.Ceil(currTimer);
+            textPro.text = ceilCurrTimer.ToString();
         }
     }
 }

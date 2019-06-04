@@ -84,6 +84,7 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
         transform.position = pos;
         Texture tex = Resources.Load<Texture>(TexturesPath + textureToApply);
         Renderer.material.SetTexture("_MainTex", tex);
+        Score.SetNextPlayerUI(Name, textureToApply);
 
         Client.RegisterObjPositionable(this.id, this);
         Client.RegisterObjDestroyable(this.id, this);
