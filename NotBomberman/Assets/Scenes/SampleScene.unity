@@ -2680,7 +2680,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: aec19771feea02d438a44a859cfb4c98, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  AnimSpeed: 0.5
+  AnimSpeed: 0.25
   TextAnim:
   - WAITING PLAYERS.
   - WAITING PLAYERS..
@@ -3099,5 +3099,11 @@ PrefabInstance:
       propertyPath: Score
       value: 
       objectReference: {fileID: 1770464364}
+    - target: {fileID: 7191492151715160819, guid: e7728378116cb5740ba46cfe3d4443fa,
+        type: 3}
+      propertyPath: DeathEffectPrefab
+      value: 
+      objectReference: {fileID: 7597998190762273888, guid: 685aace0b417252418221a512bb461c7,
+        type: 3}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: e7728378116cb5740ba46cfe3d4443fa, type: 3}

@@ -8,10 +8,11 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
     public string Name = "Nicola";
     public string TexturesPath = "Textures/BombermanTexture";
     public float InputRate = 0.25f;
+    public float SendJoinAfter = 1f;  //to show graphics effect
     public Client Client;
     public ScoreMng Score;
     public Renderer Renderer;
-    public GameObject DeathEffect;
+    public GameObject DeathEffectPrefab;
 
     private int id;
     private bool isAlive;
@@ -25,9 +26,8 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
         anim = GetComponent<Animator>();
         isAlive = true;
         joinSuccess = false;
-        Debug.Log(Name);
-        Client.SendJoinPacket(Name, this);
         Renderer.gameObject.SetActive(false);
+        Invoke("SendJoin", SendJoinAfter);
         //Invoke("OnDestroyPacketReceived", 2f);
     }
 
@@ -94,6 +94,7 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
         Texture tex = Resources.Load<Texture>(TexturesPath + textureToApply);
         Renderer.material.SetTexture("_MainTex", tex);
         Renderer.gameObject.SetActive(true);
+        Instantiate(DeathEffectPrefab, transform.position, Quaternion.identity);
 
         Score.SetNextPlayerUI(Name, textureToApply);
 
@@ -116,7 +117,7 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
     public void OnDestroyPacketReceived(string playerKilledYou)
     {
         isAlive = false;
-        Instantiate(DeathEffect, transform.position, Quaternion.identity);
+        Instantiate(DeathEffectPrefab, transform.position, Quaternion.identity);
 
         playerKilledYou = playerKilledYou.TrimEnd();
         Score.SetPlayerStatus(Name);
@@ -126,5 +127,10 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
         Client.UnregisterObject(id);
         Destroy(gameObject);
         //Application.Quit();
+    }
+
+    private void SendJoin()
+    {
+        Client.SendJoinPacket(Name, this);
     }
 }

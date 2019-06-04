@@ -17,7 +17,6 @@ public class OpponentPlayer : MonoBehaviour, ISpawnable, IPositionPacketHandler,
     void Start()
     {
         anim = GetComponent<Animator>();
-        //Invoke("OnDestroyPacketReceived", 2f);
     }
 
     void Update()
