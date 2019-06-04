@@ -44,7 +44,7 @@ public class Client : MonoBehaviour
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         socket.Blocking = false;
         endPoint = new IPEndPoint(IPAddress.Parse(Address), Port);
-        alivePacket = new Packet((byte) Operation.Alive);
+        alivePacket = new Packet((byte)Operation.Alive);
         alivePacket.ResendAfter = LoopTimeAlivePacket;
 
         packetsNeedAck = new Dictionary<int, Packet>();
@@ -68,7 +68,7 @@ public class Client : MonoBehaviour
         //Receive operations
         DequeuePackets();
         if (receivedData != null && packetOperationHandler.ContainsKey((Operation)receivedData[0]))
-        { 
+        {
             packetOperationHandler[(Operation)receivedData[0]]();
         }
 
@@ -179,9 +179,9 @@ public class Client : MonoBehaviour
 
     public static void UnregisterObject(int id)
     {
-        if(positionableObj.ContainsKey(id)) positionableObj.Remove(id);
-        if(countdownableObj.ContainsKey(id)) countdownableObj.Remove(id);
-        if(destroyableObj.ContainsKey(id)) destroyableObj.Remove(id);
+        if (positionableObj.ContainsKey(id)) positionableObj.Remove(id);
+        if (countdownableObj.ContainsKey(id)) countdownableObj.Remove(id);
+        if (destroyableObj.ContainsKey(id)) destroyableObj.Remove(id);
     }
 
     private void ProcessSpawnBombPacket()
@@ -208,7 +208,7 @@ public class Client : MonoBehaviour
             OnSpawnBombPacketReceived?.Invoke(bombID, new Vector3(x, y, z), radius, startTimer);
         }
 
-        serverPacketsAlreadyArrived[idPacket] = DefaultTimeBeforeDeletePacket;     
+        serverPacketsAlreadyArrived[idPacket] = DefaultTimeBeforeDeletePacket;
         SendAck(idPacket);
     }
 
@@ -250,7 +250,7 @@ public class Client : MonoBehaviour
         float x = BitConverter.ToSingle(receivedData, 5);
         float y = BitConverter.ToSingle(receivedData, 9);
         float z = BitConverter.ToSingle(receivedData, 13);
-        Debug.Log("Position packet received with id: " + BitConverter.ToSingle(receivedData, 14));
+        //Debug.Log("Position packet received with id: " + BitConverter.ToSingle(receivedData, 14));
 
         //Send ack does not necessary
         if (positionableObj.ContainsKey(id))
@@ -267,7 +267,7 @@ public class Client : MonoBehaviour
         int idObj = BitConverter.ToInt32(receivedData, 1);
         float currTimer = BitConverter.ToSingle(receivedData, 5);
 
-        Debug.Log("Timer packet with id: " + BitConverter.ToInt32(receivedData, 9));
+        //Debug.Log("Timer packet with id: " + BitConverter.ToInt32(receivedData, 9));
         //Send ack does not necessary
         if (countdownableObj.ContainsKey(idObj))
         {
@@ -312,7 +312,7 @@ public class Client : MonoBehaviour
             {
                 packetsNeedAck.Remove(idPacket);
                 serverPacketsAlreadyArrived.Add(idPacket, DefaultTimeBeforeDeletePacket);
-                clientJoin.OnJoinPacketFailed();              
+                clientJoin.OnJoinPacketFailed();
             }
             return;
         }
@@ -340,7 +340,7 @@ public class Client : MonoBehaviour
                 clientJoin = null;  //temporally patch
                 packetsNeedAck.Remove(idPacket);
                 serverPacketsAlreadyArrived.Add(idPacket, DefaultTimeBeforeDeletePacket);
-            }       
+            }
         }
     }
 

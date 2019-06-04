@@ -413,7 +413,7 @@ MonoBehaviour:
   Speed: 5
   Name: Nick93
   TexturesPath: Textures/BombermanTexture
-  InputRate: 0.5
+  InputRate: 0.2
   Client: {fileID: 0}
   Score: {fileID: 0}
   Renderer: {fileID: 2411840907400899902}
@@ -681,7 +681,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &2411840907406292082
 Transform:
   m_ObjectHideFlags: 0

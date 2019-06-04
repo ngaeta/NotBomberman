@@ -126,5 +126,5 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
         Client.UnregisterObject(id);
         Destroy(gameObject);
         //Application.Quit();
-    } 
+    }
 }

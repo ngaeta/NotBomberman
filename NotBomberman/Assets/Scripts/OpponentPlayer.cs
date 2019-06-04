@@ -8,7 +8,6 @@ public class OpponentPlayer : MonoBehaviour, ISpawnable, IPositionPacketHandler,
     public string TexturesPath = "Textures/BombermanTexture";
     public float TimeSinceLastPosPcktToReturnIdle = 0.35f;
     public GameObject DeathEffect;
-    public ScoreMng ScoreMng;
 
     private int id;
     private Animator anim;
@@ -42,7 +41,6 @@ public class OpponentPlayer : MonoBehaviour, ISpawnable, IPositionPacketHandler,
         Texture tex = Resources.Load<Texture>(TexturesPath + textureToApply);
         Renderer.material.SetTexture("_MainTex", tex);
         playerName = (string)properties[1];
-        //Set name on UI
 
         Client.RegisterObjPositionable(id, this);
         Client.RegisterObjDestroyable(id, this);

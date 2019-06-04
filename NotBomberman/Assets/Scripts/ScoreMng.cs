@@ -23,14 +23,14 @@ public class ScoreMng : MonoBehaviour
 
     void OnPlayerSpawn(int id, Vector3 pos, byte textureToApply, string name)
     {
+        if (WaitingText.activeSelf)
+            WaitingText.SetActive(false);
+
         SetNextPlayerUI(name.TrimEnd(), textureToApply);
     }
 
     public void SetNextPlayerUI(string name, byte spriteToApply)
     {
-        if (WaitingText.activeSelf)
-            WaitingText.SetActive(false);
-
         Sprite sprite = Resources.Load<Sprite>(SpritePath + spriteToApply);
         PlayersPanel[nextUIElement].SetActive(true);
         PlayersImage[nextUIElement].sprite = sprite;
