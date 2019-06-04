@@ -141,4 +141,4 @@ venv.bak/
 # mypy
 .mypy_cache/
 .pyc
-.idea
+.idea/
