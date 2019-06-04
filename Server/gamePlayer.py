@@ -16,10 +16,14 @@ class GamePlayer(GameObject.GameObject):
         self.send_queue = []
         self.color_player = -1
         self.start_pos = [x,y,z]
-        self.set_collider_rect(0.4,0.4, None)
+        self.set_collider_rect(0.5, 0.5, None) #if there are problems, set 0.4 0.4
         
 
     def tick(self):
         #print("{} ticked".format(self.name))
         self.malus = 0
         super().update()
+
+    def destroy(self):
+        super().destroy()
+        #use this when player die

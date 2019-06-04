@@ -1,15 +1,16 @@
 
 class CollisionMng:
 
-    go_list = []
+    __colliders__ = []
+    __removecolliders__ = []
 
     @staticmethod
     def update():
-        list_count = len(CollisionMng.go_list)
+        list_count = len(CollisionMng.__colliders__)
         for i in range(0, list_count):
-            first = CollisionMng.go_list[i]
+            first = CollisionMng.__colliders__[i]
             for j in range(i + 1, list_count):
-                second = CollisionMng.go_list[j]
+                second = CollisionMng.__colliders__[j]
 
                 check_first = False
                 check_second = False
@@ -31,6 +32,15 @@ class CollisionMng:
                 if check_second:
                     second.on_collision_enter(first)
 
+        for i in range(0, len(CollisionMng.__removecolliders__)):
+            CollisionMng.__colliders__.remove(CollisionMng.__removecolliders__[i])
+        CollisionMng.__removecolliders__.clear()
 
+    @staticmethod
+    def add_collider(collider):
+        CollisionMng.__colliders__.append(collider)
 
-
+    @staticmethod
+    def remove_collider(collider):
+        print("Remove " + str(collider.__class__.__name__))
+        CollisionMng.__removecolliders__.append(collider)

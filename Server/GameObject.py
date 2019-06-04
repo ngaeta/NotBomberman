@@ -1,6 +1,6 @@
 import pygame
-from ServerCollisionsDetection.Circle import Circle
-from ServerCollisionsDetection.CollisionMng import CollisionMng
+from ColliisonsDetection.Circle import Circle
+from ColliisonsDetection.CollisionMng import CollisionMng
 
 
 class GameObject:
@@ -18,8 +18,18 @@ class GameObject:
         GameObject.static_id_counter = GameObject.static_id_counter + 1
 
     def update(self):
-        """Set gameobject position"""
-        pass
+        #print('{} {} {}'.format(self.__class__.__name__, self.x, self.z))
+
+        if self.circle is not None:
+            self.circle.x = round(self.x)
+            self.circle.y = round(self.z)
+            #print('Circle pos: {} {}'.format(self.circle.x, self.circle.y))
+
+        if self.rect is not None:
+            self.rect.x = round(self.x)
+            self.rect.y = round(self.z)
+            #print('Rect pos: {} {}'.format(self.rect.x, self.rect.y))
+
 
     @property
     def id(self):
@@ -29,22 +39,26 @@ class GameObject:
         """Set rect collider and remove the others"""
         self.circle = None
         if self.rect is None:
-            CollisionMng.go_list.append(self)
-        self.rect = pygame.Rect(self.x, self.y, width, height)
+            CollisionMng.add_collider(self)
+        self.rect = pygame.Rect(round(self.x), round(self.z), width, height)
         self.on_collision_enter = on_collision_enter
 
     def set_collider_circle(self, radius, on_collision_enter):
         """Set circle collider and remove the others"""
         self.rect = None
         if self.circle is None:
-            CollisionMng.go_list.append(self)
-        self.circle = Circle(self.x, self.y, radius)
+            CollisionMng.add_collider(self)
+        self.circle = Circle(round(self.x), round(self.z), radius)
         self.on_collision_enter = on_collision_enter
 
     def remove_collider(self):
         self.rect = self.circle = None
         self.on_collision_enter = None
-        CollisionMng.go_list.remove(self)
+        CollisionMng.remove_collider(self)
+
+    #override this for destroy object
+    def destroy(self):
+        self.remove_collider()
 
         
 

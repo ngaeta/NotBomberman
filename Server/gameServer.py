@@ -9,7 +9,7 @@ import os
 from gamePlayer import GamePlayer
 from gameBomb import GameBomb
 from gamePacket import Packet
-from ServerCollisionsDetection.CollisionMng import CollisionMng
+from ColliisonsDetection.CollisionMng import CollisionMng
 
 COMMAND_JOIN = 0
 COMMAND_SHOOT_BOMB = 1
@@ -131,8 +131,8 @@ class GameServer:
         if self.socket not in rlist or self.next_wait <= 0:
             self.tick_players(time.perf_counter())
             self.tick_bomb()
-            self.tick_server()
             CollisionMng.update()
+            self.tick_server()
             self.next_wait = HZ
 
         if self.socket not in rlist:
@@ -363,10 +363,10 @@ class GameServer:
         
 
 
-#game_server = GameServer('127.0.0.1', 9999)
+game_server = GameServer('127.0.0.1', 9999)
 #game_server = GameServer('192.168.1.220', 9999)
 #game_server = GameServer('192.168.3.194', 9999)
-game_server = GameServer('192.168.20.80', 9999)
+#game_server = GameServer('192.168.20.80', 9999)
 
 while True:
     game_server.tick()

@@ -13,11 +13,6 @@ public class Bomb : MonoBehaviour, ITimerPacketHandler, ISpawnable
     private float radius = 1f;
     private float currTimer = 3f;
 
-    void Start()
-    {
-        anim = GetComponent<Animator>();
-    }
-
     void Update()
     {
         if (DebugStartCountDown)
@@ -38,7 +33,7 @@ public class Bomb : MonoBehaviour, ITimerPacketHandler, ISpawnable
         radius = (float)properties[0];
         currTimer = (float)properties[1];
 
-        anim = GetComponent<Animator>(); //in start does not work???
+        anim = GetComponent<Animator>(); //Spawn is called before start???
         anim.SetBool("IsActive", true);
         
         Client.RegisterObjTimerable(id, this);
