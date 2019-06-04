@@ -232,7 +232,7 @@ public class Client : MonoBehaviour
             float y = BitConverter.ToSingle(receivedData, 9);
             float z = BitConverter.ToSingle(receivedData, 13);
             byte textureToApply = receivedData[17];
-            string name = BitConverter.ToString(receivedData, 18);
+            string name = Encoding.UTF8.GetString(receivedData, 18, 10);
 
             OnSpawnPlayersPacketReceived?.Invoke(playerID, new Vector3(x, y, z), textureToApply, name);
         }

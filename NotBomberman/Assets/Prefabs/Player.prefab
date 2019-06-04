@@ -411,7 +411,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Speed: 5
-  Name: Player 1
+  Name: Nick
   TexturesPath: Textures/BombermanTexture
   Client: {fileID: 0}
   Score: {fileID: 0}

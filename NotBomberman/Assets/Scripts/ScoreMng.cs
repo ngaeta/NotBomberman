@@ -28,10 +28,10 @@ public class ScoreMng : MonoBehaviour
 
     void Update()
     {
-        Player1TextVal.text = Player1Score.ToString("00");
-        Player2TextVal.text = Player2Score.ToString("00");
-        Player3TextVal.text = Player3Score.ToString("00");
-        Player4TextVal.text = Player4Score.ToString("00");
+        //Player1TextVal.text = Player1Score.ToString("00");
+        //Player2TextVal.text = Player2Score.ToString("00");
+        //Player3TextVal.text = Player3Score.ToString("00");
+        //Player4TextVal.text = Player4Score.ToString("00");
     }
 
     void OnPlayerSpawn(int id, Vector3 pos, byte textureToApply, string name)

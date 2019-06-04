@@ -17,11 +17,6 @@ public class Bomb : MonoBehaviour, ITimerPacketHandler, ISpawnable
     private float currTimer = 3f; 
     private float ceilCurrTimer;
 
-    void Start()
-    {
-        textPro = TextMeshProObj.GetComponent<TMP_Text>();
-    }
-
     void Update()
     {
         if (DebugStartCountDown)
@@ -45,6 +40,7 @@ public class Bomb : MonoBehaviour, ITimerPacketHandler, ISpawnable
         anim = GetComponent<Animator>(); //Spawn is called before start???
         anim.SetBool("IsActive", true);
         ceilCurrTimer = Mathf.Ceil(currTimer);
+        textPro = TextMeshProObj.GetComponent<TMP_Text>();
         textPro.text = ceilCurrTimer.ToString();
 
         Client.RegisterObjTimerable(id, this);
