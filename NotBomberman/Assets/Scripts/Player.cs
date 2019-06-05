@@ -7,7 +7,8 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
     public float Speed;
     public string Name = "Nicola";
     public string TexturesPath = "Textures/BombermanTexture";
-    public float InputRate = 0.25f;
+    public float MovementInputRate = 0.25f;
+    public float ShootInputRate = 1.2f;
     public float SendJoinAfter = 1f;  //to show graphics effect
     public Client Client;
     public ScoreMng Score;
@@ -17,7 +18,8 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
     private int id;
     private bool isAlive;
     private bool joinSuccess;
-    private float inputRate;
+    private float movementInputRate;
+    private float shootInputRate;
     private Vector3 velocity;
     private Animator anim;
 
@@ -35,53 +37,62 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
     {
         if (joinSuccess)
         {
-            if (isAlive && inputRate <= 0)
+            if (isAlive)
             {
-                if (Input.GetKey(KeyCode.W))
+                if (movementInputRate <= 0)
                 {
-                    inputRate = InputRate;
-                    velocity = new Vector3(0, 0, Speed);
-                    anim.SetBool("Walk", true);
-                    transform.rotation = Quaternion.Euler(Vector3.zero);
-                    Client.SendVelocityPacket(velocity);
-                }
-                else if (Input.GetKey(KeyCode.S))
-                {
-                    inputRate = InputRate;
-                    velocity = new Vector3(0, 0, -Speed);
-                    anim.SetBool("Walk", true);
-                    transform.rotation = Quaternion.Euler(0, -180, 0);
-                    Client.SendVelocityPacket(velocity);
-                }
-                else if (Input.GetKey(KeyCode.A))
-                {
-                    inputRate = InputRate;
-                    velocity = new Vector3(-Speed, 0, 0);
-                    anim.SetBool("Walk", true);
-                    transform.rotation = Quaternion.Euler(0, -90, 0);
-                    Client.SendVelocityPacket(velocity);
-                }
-                else if (Input.GetKey(KeyCode.D))
-                {
-                    inputRate = InputRate;
-                    velocity = new Vector3(Speed, 0, 0);
-                    anim.SetBool("Walk", true);
-                    transform.rotation = Quaternion.Euler(0, 90, 0);
-                    Client.SendVelocityPacket(velocity);
+                    if (Input.GetKey(KeyCode.W))
+                    {
+                        movementInputRate = MovementInputRate;
+                        velocity = new Vector3(0, 0, Speed);
+                        anim.SetBool("Walk", true);
+                        transform.rotation = Quaternion.Euler(Vector3.zero);
+                        Client.SendVelocityPacket(velocity);
+                    }
+                    else if (Input.GetKey(KeyCode.S))
+                    {
+                        movementInputRate = MovementInputRate;
+                        velocity = new Vector3(0, 0, -Speed);
+                        anim.SetBool("Walk", true);
+                        transform.rotation = Quaternion.Euler(0, -180, 0);
+                        Client.SendVelocityPacket(velocity);
+                    }
+                    else if (Input.GetKey(KeyCode.A))
+                    {
+                        movementInputRate = MovementInputRate;
+                        velocity = new Vector3(-Speed, 0, 0);
+                        anim.SetBool("Walk", true);
+                        transform.rotation = Quaternion.Euler(0, -90, 0);
+                        Client.SendVelocityPacket(velocity);
+                    }
+                    else if (Input.GetKey(KeyCode.D))
+                    {
+                        movementInputRate = MovementInputRate;
+                        velocity = new Vector3(Speed, 0, 0);
+                        anim.SetBool("Walk", true);
+                        transform.rotation = Quaternion.Euler(0, 90, 0);
+                        Client.SendVelocityPacket(velocity);
+                    }
+                    else
+                    {
+                        velocity = Vector3.zero;
+                        anim.SetBool("Walk", false);
+                    }
                 }
                 else
-                {
-                    velocity = Vector3.zero;
-                    anim.SetBool("Walk", false);
-                }
+                    movementInputRate -= Time.deltaTime;
 
-                if (Input.GetKeyDown(KeyCode.Space))
+                if (shootInputRate <= 0)
                 {
-                    Client.SendShootBombPacket(transform.position);
+                    if (Input.GetKeyDown(KeyCode.Space))
+                    {
+                        shootInputRate = ShootInputRate;
+                        Client.SendShootBombPacket(transform.position);
+                    }
                 }
-            }
-            else
-                inputRate -= Time.deltaTime;
+                else
+                    shootInputRate -= Time.deltaTime;
+            }         
         }
     }
 
