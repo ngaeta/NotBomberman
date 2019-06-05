@@ -120,7 +120,6 @@ public class Player : MonoBehaviour, IJoinPacketHandler, IPositionPacketHandler,
         Instantiate(DeathEffectPrefab, transform.position, Quaternion.identity);
 
         playerKilledYou = playerKilledYou.TrimEnd();
-        Score.SetPlayerStatus(Name);
         string gameOverText = (playerKilledYou == Name) ? "You killed yourself" : playerKilledYou + " killed you";
         Score.SetGameOverText(gameOverText);
 

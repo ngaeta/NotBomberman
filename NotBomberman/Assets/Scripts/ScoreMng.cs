@@ -22,6 +22,7 @@ public class ScoreMng : MonoBehaviour
         playersName = new Dictionary<int, string>();
 
         Client.OnSpawnPlayersPacketReceived += OnPlayerSpawn;
+        Client.OnDestroyPacketReceived += OnDestroyPackReceived;
     }
 
     void OnPlayerSpawn(int id, Vector3 pos, byte textureToApply, string name)

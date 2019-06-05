@@ -24,8 +24,8 @@ public class Client : MonoBehaviour
     public static event SpawnBomb OnSpawnBombPacketReceived;
     public delegate void SpawnPlayerOpponents(int playerID, Vector3 pos, byte color, string name);
     public static event SpawnPlayerOpponents OnSpawnPlayersPacketReceived;
-    public delegate void PlayersDie(int playerID, string killer);
-    public static event PlayersDie OnPlayersDie;
+    public delegate void DestroyObj(int playerID, string killer);
+    public static event DestroyObj OnDestroyPacketReceived;
 
     private static Dictionary<int, IPositionPacketHandler> positionableObj;
     private static Dictionary<int, ITimerPacketHandler> countdownableObj;
@@ -290,7 +290,7 @@ public class Client : MonoBehaviour
             string playerKilledYou = Encoding.UTF8.GetString(receivedData, 5, 10);
             Debug.Log(playerKilledYou);
 
-            OnPlayersDie?.Invoke(playerId, playerKilledYou);
+            OnDestroyPacketReceived?.Invoke(playerId, playerKilledYou);
             if (destroyableObj.ContainsKey(playerId))
             {
                 destroyableObj[playerId].OnDestroyPacketReceived(playerKilledYou);
