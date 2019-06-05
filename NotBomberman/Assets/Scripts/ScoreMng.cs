@@ -15,9 +15,12 @@ public class ScoreMng : MonoBehaviour
     public string SpritePath = "Textures/BombermanSprite";
 
     private int nextUIElement;
+    private Dictionary<int, string> playersName;
 
     void Start()
     {
+        playersName = new Dictionary<int, string>();
+
         Client.OnSpawnPlayersPacketReceived += OnPlayerSpawn;
     }
 
@@ -27,6 +30,15 @@ public class ScoreMng : MonoBehaviour
             WaitingText.SetActive(false);
 
         SetNextPlayerUI(name.TrimEnd(), textureToApply);
+        playersName[id] = name.TrimEnd();
+    }
+
+    void OnDestroyPackReceived(int id, string name)
+    {
+        if(playersName.ContainsKey(id))
+        {
+            SetPlayerStatus(playersName[id]);
+        }
     }
 
     public void SetNextPlayerUI(string name, byte spriteToApply)
@@ -45,13 +57,13 @@ public class ScoreMng : MonoBehaviour
         GameOverTMPro.gameObject.SetActive(true);
     }
 
-    public void SetPlayerStatus(string playerName)
+    public void SetPlayerStatus(string playerName, string status = "Dead")
     {
         for(int i=0; i < PlayersName.Length; i++)
         {
             if(PlayersName[i].text == playerName)
             {
-                PlayersStatus[i].text = "Dead";
+                PlayersStatus[i].text = status;
                 PlayersStatus[i].color = Color.red;
                 return;
             }
