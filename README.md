@@ -1,4 +1,4 @@
-## Team Stronzi - Mattia, Luca, Nicola
+## Team: Mattia, Luca, Nicola
 
 ## NotBomberman
 
