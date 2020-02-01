@@ -1,2 +1,0 @@
-$ cat .gitattributes
-*.py linguist-language=Java
