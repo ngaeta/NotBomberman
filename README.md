@@ -2,6 +2,8 @@
 
 ## NotBomberman
 
+![Screenshot](NotBomberman_preview.png)
+
 * Simple Game like Bomberman
 * Multiplayer Online 1-4 Players
 
